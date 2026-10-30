@@ -110,9 +110,9 @@
     "request_schema": "RequestMessageMediaTranscription",
     "query_schema": null,
     "response_schema": "MessageMediaTranscriptResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "supported",
-    "notes": "Explicitly opts an inbound audio message into asynchronous transcription. A pending or succeeded receipt replays only when the requested language is omitted or matches; a failed receipt returns transcription_retry_required and points to the retry route. Create never purchases another transcription attempt."
+    "notes": "Explicitly opts an inbound audio message into asynchronous transcription. A pending or succeeded receipt replays when supplied language, prompt and keywords match the newest normalized intent; omitted fields replay unchanged; a failed receipt returns transcription_retry_required and points to the retry route. Create never purchases another transcription attempt. A keyed response, and its replay, carries text: null; GET returns the text."
   },
   {
     "resource": "messages",
@@ -125,7 +125,7 @@
     "response_schema": "MessageMediaTranscriptResponse",
     "idempotency_key": "required",
     "trace_id_header": "supported",
-    "notes": "Reopens a failed inbound-audio transcription against its exact original media asset. A same-key replay returns the stored 202; a fresh key starts one bounded manual retry generation only for a distinct retry command and when the original source remains available."
+    "notes": "Reopens a failed inbound-audio transcription against its exact original media asset. Omitted prompt/keywords inherit newest-run context; empty values clear it. A same-key normalized intent replays the stored 202; a fresh key starts one bounded manual retry generation only for a distinct retry command and when the original source remains available."
   },
   {
     "resource": "messages",
@@ -271,7 +271,7 @@
     "request_schema": null,
     "query_schema": null,
     "response_schema": "TypingIndicatorResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "supported"
   },
   {
@@ -381,7 +381,7 @@
     "response_schema": "ListenWebhookEventsResponse",
     "idempotency_key": "none",
     "trace_id_header": "none",
-    "notes": "Sandbox keys can listen directly. Production keys must pass a short-lived listen_session_id from POST /v1/webhook-events/listen-sessions; production reads are bounded to events created after the session opened. Optional start_at=tail starts after the current retained stream. Optional webhook_endpoint_id filters to that endpoint subscription and attaches a signature_preview for verifier probes."
+    "notes": "Sandbox keys can listen directly. Production reads use the owning API key's short-lived listen_session_id from POST /v1/webhook-events/listen-sessions and include only events with created_at >= session.created_at and < session.expires_at. Optional start_at=tail starts after the current retained stream. Optional webhook_endpoint_id filters to that endpoint subscription and attaches a signature_preview for verifier probes."
   },
   {
     "resource": "webhook_events",
@@ -392,9 +392,9 @@
     "request_schema": "CreateWebhookListenSessionRequest",
     "query_schema": null,
     "response_schema": "WebhookListenSessionResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "none",
-    "notes": "Production keys only. Creates one short-lived diagnostic listen session so production polling cannot become a long-running webhook transport."
+    "notes": "Production keys only. Creates one short-lived diagnostic listen session so production polling cannot become a long-running webhook transport. An active-session conflict is free and requires error.details.active_session.{id, expires_at, created_at}; only the owning API key may reuse and poll that id outside grace or renew with 30 seconds or less remaining. Renewal atomically disables the old session id, and the owner must switch polling to the returned 201 session id. A sibling must not poll it or loop POST, and waits until expires_at or coordinates with the owner to disable."
   },
   {
     "resource": "webhook_events",
@@ -420,7 +420,7 @@
     "response_schema": "WebhookEventLogResponse",
     "idempotency_key": "none",
     "trace_id_header": "none",
-    "notes": "Sandbox keys can retrieve directly. Production keys must pass an active listen_session_id and can retrieve only events created after that session opened. Optional webhook_endpoint_id attaches a signature_preview for verifier probes."
+    "notes": "Sandbox keys can retrieve directly. Production keys must pass the owning API key's active listen_session_id and can retrieve only an event with created_at >= session.created_at and < session.expires_at. Optional webhook_endpoint_id attaches a signature_preview for verifier probes."
   },
   {
     "resource": "sandbox",
@@ -567,7 +567,7 @@
     "request_schema": "RenameApiKeyRequest",
     "query_schema": null,
     "response_schema": "ApiKeyResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "none"
   },
   {
@@ -604,7 +604,8 @@
     "query_schema": null,
     "response_schema": "PaymentResponse",
     "idempotency_key": "supported",
-    "trace_id_header": "supported"
+    "trace_id_header": "supported",
+    "notes": "Every accepted payment is charged its payment-service fees in the creation transaction, and the response reports them in fees (null when no fee is owed). The creation is refused before anything is created or charged, with no idempotency receipt kept, with 402 payment_required and stable code insufficient_balance when the production balance cannot cover the initiation fee plus the completion fee hold, or with 503 service_unavailable and stable code payment_fee_pricing_unavailable when the fee prices cannot be read. Both refusals carry the error.feedback pointer."
   },
   {
     "resource": "payments",
@@ -629,6 +630,19 @@
     "response_schema": "PaymentResponse",
     "idempotency_key": "none",
     "trace_id_header": "none"
+  },
+  {
+    "resource": "payments",
+    "operation": "cancel",
+    "method": "POST",
+    "path": "/v1/payments/:payment_id/cancel",
+    "scope": "payments:write",
+    "request_schema": "CancelPaymentRequest",
+    "query_schema": null,
+    "response_schema": "PaymentResponse",
+    "idempotency_key": "supported",
+    "trace_id_header": "supported",
+    "notes": "Queues hosted-checkout cancellation and returns HTTP 200 with the current payment. Poll until the provider confirms a terminal status. Same-key replay returns the original response. Transparent Pix and unsupported providers return payment_cancellation_unsupported with error.feedback and change nothing. Terminal hosted payments return their current state without a provider call."
   },
   {
     "resource": "payments",
@@ -712,7 +726,8 @@
     "query_schema": null,
     "response_schema": "AgenticPaymentResponse",
     "idempotency_key": "supported",
-    "trace_id_header": "supported"
+    "trace_id_header": "supported",
+    "notes": "Every accepted payment is charged its payment-service fees in the creation transaction, and the response reports them in fees (null when no fee is owed). The creation is refused before anything is created or charged, with no idempotency receipt kept, with 402 payment_required and stable code insufficient_balance when the production balance cannot cover the initiation fee plus the completion fee hold, or with 503 service_unavailable and stable code payment_fee_pricing_unavailable when the fee prices cannot be read. Both refusals carry the error.feedback pointer."
   },
   {
     "resource": "agentic_payments",
@@ -795,7 +810,7 @@
     "request_schema": "UpdateAIAgentRequest",
     "query_schema": null,
     "response_schema": "AIAgentResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "none"
   },
   {
@@ -951,7 +966,7 @@
     "request_schema": "UpdateAutomationRequest",
     "query_schema": null,
     "response_schema": "AutomationResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "none"
   },
   {
@@ -1096,7 +1111,7 @@
     "request_schema": null,
     "query_schema": null,
     "response_schema": "AutomationRunResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "none"
   },
   {
@@ -1314,7 +1329,8 @@
     "query_schema": null,
     "response_schema": "BillingPaymentMethodResponse",
     "idempotency_key": "supported",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "Saves a card after SetupIntent confirmation. When a failed automatic top-up turned auto top-up off, saving a card turns it back on and points it at this card, with no immediate charge; a configuration turned off with PUT /v1/billing/auto-topup, by deleting its card, or by a full refund of a cash top-up, stays off. A refund pause is re-armed only with PUT /v1/billing/auto-topup enabled: true. Honors Idempotency-Key; a duplicate sent while the first request is still in flight returns 409 idempotency_key_in_progress — retry after the original finishes."
   },
   {
     "resource": "billing",
@@ -1338,7 +1354,8 @@
     "query_schema": null,
     "response_schema": "BillingPaymentMethodResponse",
     "idempotency_key": "supported",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "Makes an active saved card the default. When a failed automatic top-up turned auto top-up off, this turns it back on and points it at this card, with no immediate charge; a configuration turned off with PUT /v1/billing/auto-topup, by deleting its card, or by a full refund of a cash top-up, stays off. A refund pause is re-armed only with PUT /v1/billing/auto-topup enabled: true. Honors Idempotency-Key; a duplicate sent while the first request is still in flight returns 409 idempotency_key_in_progress — retry after the original finishes."
   },
   {
     "resource": "billing",
@@ -1362,7 +1379,8 @@
     "query_schema": null,
     "response_schema": "AutoTopupConfigResponse",
     "idempotency_key": "none",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "A failed automatic top-up turns enabled off. A full cash refund pauses auto top-up. The refund pause applies when the entire credit is reversed or pre-empted before it lands; Abacate refund and dispute events are applied to the whole top-up credit. Partial Stripe refunds do not pause auto top-up. A refund pause is re-armed only with PUT enabled: true, not by saving or defaulting a card; it sends no notice and does not cancel an already pending automatic top-up. Saving a card or making one default turns back on only a configuration a failure turned off, with no immediate charge. PUT with enabled: true turns it on and, when the balance is already at or below threshold_brl, starts one automatic top-up immediately."
   },
   {
     "resource": "billing",
@@ -1374,7 +1392,8 @@
     "query_schema": null,
     "response_schema": "AutoTopupConfigResponse",
     "idempotency_key": "supported",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "Replaces the configuration. enabled: true turns auto top-up on, including a configuration a failed automatic top-up or full refund of a cash top-up turned off; enabled: false keeps it off even when a card is saved later. A full cash refund pause reads enabled: false and blocks new auto top-ups until these settings are saved again with enabled: true; later automatic activity or card changes do not acknowledge the refund. When it ends enabled and the balance is already at or below threshold_brl, the write starts one automatic top-up of amount_brl on the saved card immediately, unless one is pending, and last_triggered_at shows it; otherwise the next one starts when a usage debit, phone-management fee, phone-purchase reservation, payment fee, or rental-receivable settlement leaves the balance at or below threshold_brl, regardless of its prior balance, unless one is pending. Auto top-up never starts for a suspended organization. The watchdog also checks enabled, unpaused configurations with a wallet at or below the threshold and no pending automatic top-up, currently every 15 minutes. After a card re-arm the next such debit or watchdog run can start one. If credit from the top-up leaves the wallet at or below the threshold, the next such debit or watchdog run can start another of amount_brl; the charge is never resized to the shortfall. Honors Idempotency-Key; a duplicate sent while the first request is still in flight returns 409 idempotency_key_in_progress — retry after the original finishes."
   },
   {
     "resource": "billing",
@@ -1390,6 +1409,18 @@
   },
   {
     "resource": "billing",
+    "operation": "list_phone_management",
+    "method": "GET",
+    "path": "/v1/billing/phone-management",
+    "scope": "billing:read",
+    "request_schema": null,
+    "query_schema": "ListPhoneManagementQuery",
+    "response_schema": "ListPhoneManagementResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none"
+  },
+  {
+    "resource": "billing",
     "operation": "list_phone_renewals",
     "method": "GET",
     "path": "/v1/billing/phone-renewals",
@@ -1399,7 +1430,8 @@
     "response_schema": "ListPhoneRenewalsResponse",
     "idempotency_key": "none",
     "trace_id_header": "none",
-    "notes": "Lists prepaid phone-rental renewal decisions in the API key tenant/project/environment using cursor pagination. The optional status filter narrows by durable billing status; this read remains available to exhausted production keys for account recovery."
+    "notes": "Deprecated: read the renewal field of GET /v1/phone-numbers and GET /v1/phone-numbers/:id instead. Lists the renewal cycles recorded by the retired prepaid renewal design in the API key tenant/project/environment using cursor pagination; no new cycle is recorded. The optional status filter narrows by stored cycle status, and a query the schema rejects returns 400 invalid_query. This read remains available to exhausted production keys.",
+    "deprecated": true
   },
   {
     "resource": "billing",
@@ -1412,7 +1444,8 @@
     "response_schema": "PhoneRenewalResponse",
     "idempotency_key": "none",
     "trace_id_header": "none",
-    "notes": "Retrieves one prepaid phone-rental renewal decision in the API key tenant/project/environment. Missing and cross-scope cycle ids return phone_renewal_not_found without revealing whether the id exists."
+    "notes": "Deprecated: read the renewal field of GET /v1/phone-numbers/:id instead. Retrieves one renewal cycle recorded by the retired prepaid renewal design in the API key tenant/project/environment. Missing and cross-scope cycle ids return phone_renewal_not_found without revealing whether the id exists.",
+    "deprecated": true
   },
   {
     "resource": "billing",
@@ -1650,6 +1683,175 @@
     "trace_id_header": "none"
   },
   {
+    "resource": "groups",
+    "operation": "retrieve_eligibility",
+    "method": "GET",
+    "path": "/v1/groups/eligibility",
+    "scope": "groups:read",
+    "request_schema": null,
+    "query_schema": "GroupEligibilityQuery",
+    "response_schema": "GroupEligibilityResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Reads, without calling Meta, whether a Tyxter phone number can host WhatsApp Business groups. Sandbox numbers answer eligible; production numbers answer not_checked until an eligibility check has run for them. A phone number outside the key environment returns 404 phone_number_not_found."
+  },
+  {
+    "resource": "groups",
+    "operation": "create_eligibility_check",
+    "method": "POST",
+    "path": "/v1/groups/eligibility-checks",
+    "scope": "groups:write",
+    "request_schema": "CreateGroupEligibilityCheckRequest",
+    "query_schema": null,
+    "response_schema": "GroupEligibilityResponse",
+    "idempotency_key": "supported",
+    "trace_id_header": "none",
+    "notes": "Accepts a WhatsApp Business groups eligibility check (202) and returns the stored answer with check_requested_at set; a worker reads the facts from Meta (production) or answers eligible (sandbox), and GET /v1/groups/eligibility then shows the result. The API never calls Meta. A phone number outside the key environment returns 404 phone_number_not_found."
+  },
+  {
+    "resource": "groups",
+    "operation": "create",
+    "method": "POST",
+    "path": "/v1/groups",
+    "scope": "groups:write",
+    "request_schema": "CreateGroupRequest",
+    "query_schema": null,
+    "response_schema": "GroupResponse",
+    "idempotency_key": "supported",
+    "trace_id_header": "none",
+    "notes": "Accepts a WhatsApp Business group (202) with status pending and a Tyxter group id; the API never calls Meta. A new group stays pending until a Tyxter worker resolves its create outcome. Refused with 422 group_phone_number_not_eligible only when the stored eligibility answer for the number is not_eligible."
+  },
+  {
+    "resource": "groups",
+    "operation": "list",
+    "method": "GET",
+    "path": "/v1/groups",
+    "scope": "groups:read",
+    "request_schema": null,
+    "query_schema": "ListGroupsQuery",
+    "response_schema": "ListGroupsResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Lists the WhatsApp Business groups of the key environment, newest first, with cursor pagination and optional phone_number_id and status filters."
+  },
+  {
+    "resource": "groups",
+    "operation": "retrieve",
+    "method": "GET",
+    "path": "/v1/groups/:group_id",
+    "scope": "groups:read",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "GroupResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Retrieves one WhatsApp Business group by its Tyxter id. A personal WhatsApp group invite link or app group id returns 422 personal_whatsapp_group_not_supported; any other unknown id returns 404 group_not_found."
+  },
+  {
+    "resource": "groups",
+    "operation": "delete",
+    "method": "DELETE",
+    "path": "/v1/groups/:group_id",
+    "scope": "groups:write",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "GroupResponse",
+    "idempotency_key": "supported",
+    "trace_id_header": "none",
+    "notes": "Deletes one WhatsApp Business group (202); the API never calls Meta. An active group becomes deleting and a Tyxter worker deletes it (sandbox: deleted; production: deleted, or back to active with failure, from the outcome Meta reports); a failed group becomes deleted with no provider call; a deleting group accepts reconciliation and a controlled retry only after provider presence is confirmed; a deleted group is returned unchanged; a pending group returns 409 group_not_active. Stays available when the groups feature family is disabled."
+  },
+  {
+    "resource": "groups",
+    "operation": "teach_personal_invite_get_0",
+    "method": "GET",
+    "path": "/v1/groups/https://chat.whatsapp.com/*",
+    "scope": "groups:read",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "TyxterErrorResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Authenticated teaching-only route for a pasted unencoded personal WhatsApp invite link. Returns 422 personal_whatsapp_group_not_supported without echoing the invite code, reading or changing a Group. Stays available when groups is disabled; no idempotency receipt or standalone SDK method."
+  },
+  {
+    "resource": "groups",
+    "operation": "teach_personal_invite_delete_0",
+    "method": "DELETE",
+    "path": "/v1/groups/https://chat.whatsapp.com/*",
+    "scope": "groups:write",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "TyxterErrorResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Authenticated teaching-only route for a pasted unencoded personal WhatsApp invite link. Returns 422 personal_whatsapp_group_not_supported without echoing the invite code, reading or changing a Group. Stays available when groups is disabled; no idempotency receipt or standalone SDK method."
+  },
+  {
+    "resource": "groups",
+    "operation": "teach_personal_invite_get_1",
+    "method": "GET",
+    "path": "/v1/groups/http://chat.whatsapp.com/*",
+    "scope": "groups:read",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "TyxterErrorResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Authenticated teaching-only route for a pasted unencoded personal WhatsApp invite link. Returns 422 personal_whatsapp_group_not_supported without echoing the invite code, reading or changing a Group. Stays available when groups is disabled; no idempotency receipt or standalone SDK method."
+  },
+  {
+    "resource": "groups",
+    "operation": "teach_personal_invite_delete_1",
+    "method": "DELETE",
+    "path": "/v1/groups/http://chat.whatsapp.com/*",
+    "scope": "groups:write",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "TyxterErrorResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Authenticated teaching-only route for a pasted unencoded personal WhatsApp invite link. Returns 422 personal_whatsapp_group_not_supported without echoing the invite code, reading or changing a Group. Stays available when groups is disabled; no idempotency receipt or standalone SDK method."
+  },
+  {
+    "resource": "groups",
+    "operation": "teach_personal_invite_get_2",
+    "method": "GET",
+    "path": "/v1/groups/chat.whatsapp.com/*",
+    "scope": "groups:read",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "TyxterErrorResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Authenticated teaching-only route for a pasted unencoded personal WhatsApp invite link. Returns 422 personal_whatsapp_group_not_supported without echoing the invite code, reading or changing a Group. Stays available when groups is disabled; no idempotency receipt or standalone SDK method."
+  },
+  {
+    "resource": "groups",
+    "operation": "teach_personal_invite_delete_2",
+    "method": "DELETE",
+    "path": "/v1/groups/chat.whatsapp.com/*",
+    "scope": "groups:write",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "TyxterErrorResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Authenticated teaching-only route for a pasted unencoded personal WhatsApp invite link. Returns 422 personal_whatsapp_group_not_supported without echoing the invite code, reading or changing a Group. Stays available when groups is disabled; no idempotency receipt or standalone SDK method."
+  },
+  {
+    "resource": "groups",
+    "operation": "reset_invite_link",
+    "method": "POST",
+    "path": "/v1/groups/:group_id/invite-link/reset",
+    "scope": "groups:write",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "GroupResponse",
+    "idempotency_key": "supported",
+    "trace_id_header": "none",
+    "notes": "Resets the invite link of one active WhatsApp Business group (202); the API never calls Meta and the group stays active. A Tyxter worker then replaces the stored invite_link (sandbox: a new sandbox link; production: the link Meta returns), or records failure with the old link kept. Any other status returns 409 group_not_active. A same-key replay never resets again. Refused with 403 feature_disabled when the groups feature family is disabled."
+  },
+  {
     "resource": "llm_routes",
     "operation": "upsert",
     "method": "PUT",
@@ -1682,7 +1884,7 @@
     "request_schema": "UpdateLLMRouteRequest",
     "query_schema": "LLMRouteTargetQuery",
     "response_schema": "LLMRouteResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "none"
   },
   {
@@ -1765,10 +1967,36 @@
     "scope": "phone_numbers:write",
     "request_schema": "ProvisionPhoneNumberRequest",
     "query_schema": null,
-    "response_schema": "PhoneNumberResponse",
+    "response_schema": "PhoneNumberMutationResponse",
     "idempotency_key": "supported",
     "trace_id_header": "none",
-    "notes": "Production requests require a verified business identity (KYC) and a current verified owner/admin billing WhatsApp recipient with explicit transactional consent. The recipient is an operational contact, never the legal KYC phone. Missing identity fails with 403 authorization_error and stable code kyc_required (no identity / rejected) or kyc_pending (submitted, not yet verified); missing or stale recipient evidence fails with billing_whatsapp_required. Every gate runs before any row is written. Production requests then enforce two number limits in order — the subscription plan phone-number allowance, which counts numbers of both kinds (FREE 1 / STANDARD 3 / GROWTH no fixed limit), returning 402 payment_required with stable code plan_phone_limit_reached, and then a per-organization limit on concurrently held Tyxter-provisioned (Salvy) numbers (FREE 1 / STANDARD 3 / GROWTH 10 by default, raised per organization on request) returning 409 conflict with stable code phone_number_limit_reached — release a Tyxter-provisioned number to free its slot, or contact us to raise the limit. Only once both pass does the request reserve the first phone.number.month BRL charge before Salvy is called; insufficient funds return 402 payment_required with stable code insufficient_balance. Sandbox provisioning is KYC-free, capped by neither limit, and does not reserve or debit balance. All provision requests share a per-organization rate limit (burst 5, sustained 10/hour) returning 429 rate_limited with Retry-After."
+    "notes": "Sandbox requests provision a simulated number and return 202 with the requested phone; sandbox provisioning is KYC-free, capped by neither number limit, and does not reserve or debit balance. A production request rents nothing: it creates a rental order as POST /v1/phone-numbers/orders does and returns 409 conflict with stable code phone_number_rental_approval_required, whose error.details.order carries the order id, approval_url and expires_at, with the error.feedback pointer; an organization owner or admin approves or declines the order in the dashboard, no API key can approve it, and GET /v1/phone-numbers/orders/:order_id follows it. The 409 already created the order, so a client must not also create one with POST /v1/phone-numbers/orders. A replay of the same Idempotency-Key returns the same 409 for the same order; without a key each request creates a new order. Before the order is written, production requests require a verified business identity (KYC). When PHONE_PROVISIONING_REQUIRE_BILLING_WHATSAPP is enabled (default false), they also require a current verified owner/admin billing WhatsApp recipient with explicit transactional consent; startup rejects that enabled policy without valid paired AUTH_WA_SIGNUP proof settings. The recipient is an operational contact, never the legal KYC phone. Missing identity fails with 403 authorization_error and stable code kyc_required (no identity / rejected) or kyc_pending (submitted, not yet verified); under the enabled policy, missing or stale recipient evidence fails with billing_whatsapp_required. Production requests then enforce two number limits in order — the subscription plan phone-number allowance, which counts numbers of both kinds (FREE 1 / STANDARD 3 / GROWTH no fixed limit), returning 402 payment_required with stable code plan_phone_limit_reached, and then a per-organization limit on concurrently held Tyxter-provisioned (Salvy) numbers (FREE 1 / STANDARD 3 / GROWTH 10 by default, raised per organization on request) returning 409 conflict with stable code phone_number_limit_reached — release a Tyxter-provisioned number to free its slot, or contact us to raise the limit. When the rental price or a charge date cannot be determined it fails with 503 phone_number_rental_preview_unavailable and creates nothing. Nothing is reserved before the approval. All provision requests share a per-organization rate limit with order creation (burst 5, sustained 10/hour) returning 429 rate_limited with Retry-After."
+  },
+  {
+    "resource": "phone_numbers",
+    "operation": "create_order",
+    "method": "POST",
+    "path": "/v1/phone-numbers/orders",
+    "scope": "phone_numbers:write",
+    "request_schema": "CreatePhoneNumberOrderRequest",
+    "query_schema": null,
+    "response_schema": "PhoneNumberOrderResponse",
+    "idempotency_key": "supported",
+    "trace_id_header": "none",
+    "notes": "Creates a rental order for one Tyxter-provisioned number and returns 201. A production order runs the provision checks in their order (verified business identity, the optional billing WhatsApp recipient, the plan phone-number allowance and the Tyxter-provisioned number limit) and reserves nothing: it returns status awaiting_approval with the priced preview, terms_version, expires_at (24 hours after the preview) and an approval_url to hand to an organization owner or admin, who approves or declines it in the dashboard. No API key can approve an order. When the rental price or a charge date cannot be determined it fails with 503 phone_number_rental_preview_unavailable and creates nothing. A sandbox order is approved on creation with a free preview and starts the simulated provisioning at once. Order creation shares the per-organization provision rate limit (burst 5, sustained 10/hour). A replay of the same Idempotency-Key returns the order as it was created; read GET /v1/phone-numbers/orders/:order_id for its current status."
+  },
+  {
+    "resource": "phone_numbers",
+    "operation": "retrieve_order",
+    "method": "GET",
+    "path": "/v1/phone-numbers/orders/:order_id",
+    "scope": "phone_numbers:read",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "PhoneNumberOrderResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Returns the rental order in the API key project and environment with its current status: awaiting_approval, approved, declined, expired (failure carries phone_number_order_expired or phone_number_order_terms_changed; declined carries phone_number_order_declined), then provisioning, fulfilled or failed as the approved number progresses. An unknown or foreign order id returns 404 phone_number_order_not_found."
   },
   {
     "resource": "phone_numbers",
@@ -1778,9 +2006,35 @@
     "scope": "phone_numbers:write",
     "request_schema": "ConnectPhoneNumberRequest",
     "query_schema": null,
-    "response_schema": "PhoneNumberResponse",
+    "response_schema": "PhoneNumberMutationResponse",
     "idempotency_key": "supported",
     "trace_id_header": "none"
+  },
+  {
+    "resource": "phone_numbers",
+    "operation": "import_salvy",
+    "method": "POST",
+    "path": "/v1/phone-numbers/import-salvy",
+    "scope": "phone_numbers:write",
+    "request_schema": "ImportSalvyPhoneNumberRequest",
+    "query_schema": null,
+    "response_schema": "PhoneNumberResponse",
+    "idempotency_key": "required",
+    "trace_id_header": "none",
+    "notes": "Imports exactly one explicitly selected cached account-owned Salvy resource. The phone remains source=byon with provider_number_id=null; no discovery request creates a phone or calls Salvy. Production admission shares the plan phone allowance with connect, rental orders (which a production provision creates), and Embedded Signup; a transfer stays within one environment kind and admits no phone."
+  },
+  {
+    "resource": "phone_numbers",
+    "operation": "complete_salvy_registration",
+    "method": "POST",
+    "path": "/v1/phone-numbers/:phone_number_id/salvy/complete-registration",
+    "scope": "phone_numbers:write",
+    "request_schema": "CompleteSalvyPhoneRegistrationRequest",
+    "query_schema": null,
+    "response_schema": "PhoneNumberResponse",
+    "idempotency_key": "required",
+    "trace_id_header": "none",
+    "notes": "Queues independent same-environment Meta WABA membership validation for an imported customer Salvy resource. A connected Salvy account alone never activates messaging."
   },
   {
     "resource": "phone_numbers",
@@ -1790,9 +2044,10 @@
     "scope": "phone_numbers:read",
     "request_schema": null,
     "query_schema": null,
-    "response_schema": "PhoneNumberResponse",
+    "response_schema": "PhoneNumberReadResponse",
     "idempotency_key": "none",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "An unknown or out-of-scope phone id returns 404 phone_number_not_found."
   },
   {
     "resource": "phone_numbers",
@@ -1804,7 +2059,21 @@
     "query_schema": null,
     "response_schema": "PhoneNumberResponse",
     "idempotency_key": "none",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "Marks the number disconnected, emits phone_number.disconnected and is a no-op on terminal rows. It does not release the number: a production Tyxter-rented (Salvy) number keeps its monthly rental until it is released through POST /v1/phone-numbers/:phone_number_id/release; the release request (status release_requested) stops further monthly charges. An unknown or out-of-scope phone id returns 404 phone_number_not_found."
+  },
+  {
+    "resource": "phone_numbers",
+    "operation": "convert_to_byon",
+    "method": "POST",
+    "path": "/v1/phone-numbers/:phone_number_id/convert-to-byon",
+    "scope": "phone_numbers:write",
+    "request_schema": "ConvertPhoneNumberToByonRequest",
+    "query_schema": null,
+    "response_schema": "PhoneNumberResponse",
+    "idempotency_key": "required",
+    "trace_id_header": "none",
+    "notes": "Ends optional customer-Salvy management while preserving the same BYON phone and Meta link."
   },
   {
     "resource": "phone_numbers",
@@ -1816,7 +2085,8 @@
     "query_schema": null,
     "response_schema": "PhoneNumberResponse",
     "idempotency_key": "supported",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "Returns 202. A Salvy number moves to release_requested and a worker cancels it at Salvy; the row becomes released, with phone_number.released, once Salvy accepts the cancellation or reports the line already gone, and other Salvy failures are retried while it stays release_requested. A BYON number moves directly to released. A replay on a terminal row returns it unchanged. An unknown or out-of-scope phone id returns 404 phone_number_not_found."
   },
   {
     "resource": "phone_numbers",
@@ -1828,7 +2098,8 @@
     "query_schema": null,
     "response_schema": "PhoneNumberResponse",
     "idempotency_key": "supported",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "Moves the number to another project/environment of the same kind in the organization. Refusals: 400 invalid_transfer_request (malformed body), phone_number_confirmation_mismatch, phone_number_transfer_same_environment or phone_number_transfer_environment_kind_mismatch; 403 feature_disabled when the target environment disabled provisioning; 404 phone_number_not_found (unknown phone, or a key outside the stated source) or target_environment_not_found; 409 phone_number_not_transferable (non-transferable status) or phone_number_conflict (the E.164 or Meta phone id is already held in the target)."
   },
   {
     "resource": "provider_connections",
@@ -1925,9 +2196,23 @@
     "scope": "provider_connections:write",
     "request_schema": "ApiKeyRegisterMetaConnectionRequest",
     "query_schema": null,
-    "response_schema": "ProviderConnectionResponse",
+    "response_schema": "MetaConnectionMutationResponse",
     "idempotency_key": "supported",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "Answers 202 with the connection and its queued operation (kind meta_registration); the API never calls Meta on this request. The provider worker validates the sealed credential with Meta and connects the row or fails the operation with a stable error_code; poll GET /v1/provider-connections/{connection_id} until operation.state is succeeded or failed, or operation.kind is meta_token_rotation, meta_oauth_exchange or meta_registration_completion because a token rotation, an OAuth code exchange or a complete-registration replaced it, or operation is null because a credential write from an older API image replaced it."
+  },
+  {
+    "resource": "provider_connections",
+    "operation": "register_salvy",
+    "method": "POST",
+    "path": "/v1/provider-connections/salvy",
+    "scope": "provider_connections:write",
+    "request_schema": "ApiKeyRegisterSalvyConnectionRequest",
+    "query_schema": null,
+    "response_schema": "ProviderConnectionResponse",
+    "idempotency_key": "required",
+    "trace_id_header": "none",
+    "notes": "Creates a pending customer-owned Salvy connection. Production uses the Salvy adapter; sandbox uses the same sealed lifecycle with a deterministic provider-free simulator. Validation and discovery run asynchronously in the provider worker; the API never calls Salvy on this request."
   },
   {
     "resource": "provider_connections",
@@ -1937,9 +2222,10 @@
     "scope": "provider_connections:write",
     "request_schema": "ApiKeyExchangeMetaOAuthCodeRequest",
     "query_schema": null,
-    "response_schema": "ProviderConnectionResponse",
+    "response_schema": "MetaConnectionMutationResponse",
     "idempotency_key": "supported",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "Answers 202 with the connection and its queued operation (kind meta_oauth_exchange); the API never calls Meta on this request. The provider worker sends the sealed single-use code to Meta at most once, never twice, completes Embedded Signup and connects the row or fails the operation with a stable error_code; poll GET /v1/provider-connections/{connection_id} until operation.state is succeeded or failed. A newer registration, token rotation or complete-registration that replaces it changes operation.kind; a newer code exchange (including a hosted Embedded Signup completion's) replaces it under the same kind. operation becomes null instead when a credential write from an older API image replaced it. The same code posted again while its exchange is queued returns that exchange's connection."
   },
   {
     "resource": "provider_connections",
@@ -1961,10 +2247,10 @@
     "scope": "provider_connections:write",
     "request_schema": null,
     "query_schema": null,
-    "response_schema": "ProviderConnectionResponse",
+    "response_schema": "MetaConnectionMutationResponse",
     "idempotency_key": "supported",
     "trace_id_header": "none",
-    "notes": "Finishes a pending Meta WhatsApp connection from its stored credentials. No request body."
+    "notes": "Finishes a pending Meta WhatsApp connection from its stored credentials. No request body. Answers 202 with the still-pending connection and its queued operation (kind meta_registration_completion); the API never calls Meta on this request. The provider worker re-runs the remaining signup steps and the credential validation from the stored token and connects the row or fails the operation with a stable error_code, leaving the connection pending. Poll GET /v1/provider-connections/{connection_id} until operation.state is succeeded or failed, or operation.kind changes because a newer registration, OAuth code exchange or token rotation replaced it, or operation is null because a credential write from an older API image replaced it. A complete-registration posted while one is queued returns that queued one and queues nothing."
   },
   {
     "resource": "provider_connections",
@@ -1976,6 +2262,45 @@
     "query_schema": null,
     "response_schema": "RotateProviderConnectionTokenResponse",
     "idempotency_key": "supported",
+    "trace_id_header": "none",
+    "notes": "Answers 202 with the connection and its queued operation (kind meta_token_rotation); the API never calls Meta on this request. The connection keeps its current token and status until the provider worker validates the new token with Meta against the identifiers already on the connection and swaps it in; a refusal fails the operation with a stable error_code and the current token stays. Poll GET /v1/provider-connections/{connection_id} until operation.state is succeeded or failed, or operation is null because a later credential write replaced the rotation, or operation.kind is meta_registration, meta_oauth_exchange or meta_registration_completion because a later registration, OAuth code exchange or complete-registration replaced it."
+  },
+  {
+    "resource": "provider_connections",
+    "operation": "rotate_salvy",
+    "method": "POST",
+    "path": "/v1/provider-connections/:connection_id/salvy/rotate",
+    "scope": "provider_connections:write",
+    "request_schema": "ApiKeyRotateSalvyConnectionRequest",
+    "query_schema": null,
+    "response_schema": "ProviderConnectionResponse",
+    "idempotency_key": "required",
+    "trace_id_header": "none",
+    "notes": "Queues candidate-key validation. The current stored Salvy credential is retained while the candidate is checked; the candidate is validated only after its connection reaches connected."
+  },
+  {
+    "resource": "provider_connections",
+    "operation": "refresh_salvy_discovery",
+    "method": "POST",
+    "path": "/v1/provider-connections/:connection_id/salvy/discovery",
+    "scope": "provider_connections:write",
+    "request_schema": "RefreshSalvyDiscoveryRequest",
+    "query_schema": null,
+    "response_schema": "ProviderConnectionResponse",
+    "idempotency_key": "required",
+    "trace_id_header": "none",
+    "notes": "Queues a refresh of the persisted Salvy inventory snapshot using the current stored credential on a connected connection. The API serves the existing snapshot until the worker completes."
+  },
+  {
+    "resource": "provider_connections",
+    "operation": "list_salvy_numbers",
+    "method": "GET",
+    "path": "/v1/provider-connections/:connection_id/salvy/numbers",
+    "scope": "provider_connections:read",
+    "request_schema": null,
+    "query_schema": "CursorPaginationQuery",
+    "response_schema": "ListSalvyNumbersResponse",
+    "idempotency_key": "none",
     "trace_id_header": "none"
   },
   {
@@ -2036,7 +2361,7 @@
     "request_schema": "SandboxTemplateStatusRequest",
     "query_schema": null,
     "response_schema": "TemplateResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "supported",
     "notes": "Sandbox keys only. Forces rejected, paused, or disabled template provider states for send-refusal tests."
   },
@@ -2052,6 +2377,19 @@
     "idempotency_key": "supported",
     "trace_id_header": "supported",
     "notes": "Sandbox keys only. Forces paid, failed, expired, or cancelled payment request states and emits the matching customer-visible payment event."
+  },
+  {
+    "resource": "sandbox",
+    "operation": "simulate_group_participant",
+    "method": "POST",
+    "path": "/v1/sandbox/groups/:group_id/participants",
+    "scope": "groups:write",
+    "request_schema": "SandboxGroupParticipantRequest",
+    "query_schema": null,
+    "response_schema": "GroupResponse",
+    "idempotency_key": "supported",
+    "trace_id_header": "none",
+    "notes": "Sandbox keys only (400 sandbox_group_participant_sandbox_only otherwise). Simulates Meta reporting that a participant joined (action join) or was removed (action remove) on an active WhatsApp Business group and returns the group with its participants (200). A join of a current member or a removal of a non-member changes nothing and writes no event, so a replay with or without Idempotency-Key never records the fact twice. A ninth joined participant returns 409 group_participant_limit_reached (Meta documents a cap of eight). Any status other than active returns 409 group_not_active. Refused with 403 feature_disabled when the groups feature family is disabled."
   },
   {
     "resource": "sandbox",
@@ -2172,7 +2510,7 @@
     "request_schema": "EstimateTemplateCostRequest",
     "query_schema": null,
     "response_schema": "TemplateCostEstimateResponse",
-    "idempotency_key": "none",
+    "idempotency_key": "supported",
     "trace_id_header": "none"
   },
   {
