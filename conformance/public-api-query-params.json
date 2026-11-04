@@ -1,5 +1,6 @@
 {
   "CursorPaginationQuery": ["limit", "starting_after"],
+  "GroupEligibilityQuery": ["phone_number_id"],
   "ListAgenticAuthorizationsQuery": ["customer_tax_id", "limit", "starting_after", "status"],
   "ListAgenticBanksQuery": ["limit", "search"],
   "ListAgenticPaymentsQuery": ["customer_tax_id", "limit", "starting_after", "status"],
@@ -21,16 +22,26 @@
     "webhook_endpoint_id"
   ],
   "ListFiscalDocumentsQuery": ["limit", "source_kind", "starting_after", "status"],
+  "ListGroupsQuery": ["limit", "phone_number_id", "starting_after", "status"],
   "ListInvoicesQuery": ["limit", "project_id", "starting_after"],
   "ListLedgerEntriesQuery": ["environment", "limit", "source_type", "starting_after"],
   "ListLLMResponseLogsQuery": ["limit", "starting_after"],
   "ListLLMRoutePromptVersionsQuery": ["limit", "phone_number_id", "starting_after"],
   "ListMediaAssetsRequest": ["kind", "lifecycle", "limit", "source", "starting_after", "status"],
-  "ListMessagesQuery": ["batch_id", "direction", "include", "limit", "starting_after", "status"],
+  "ListMessagesQuery": [
+    "batch_id",
+    "created_after",
+    "direction",
+    "include",
+    "limit",
+    "starting_after",
+    "status"
+  ],
   "ListPaymentsQuery": ["limit", "starting_after", "status"],
-  "ListProjectsQuery": ["limit", "starting_after"],
+  "ListPhoneManagementQuery": ["limit", "starting_after"],
   "ListPhoneNumbersQuery": ["limit", "starting_after", "status"],
   "ListPhoneRenewalsQuery": ["limit", "starting_after", "status"],
+  "ListProjectsQuery": ["limit", "starting_after"],
   "ListPublicFeedbackReportsQuery": ["after", "limit"],
   "ListRateCardsQuery": ["currency", "limit", "starting_after"],
   "ListUsageRecordsQuery": [
