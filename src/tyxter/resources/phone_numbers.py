@@ -11,7 +11,9 @@ from tyxter.types import (
     ListAvailableRegionsResponse,
     ListPhoneNumbersResponse,
     MetaDiagnosticsResponse,
+    PhoneNumberMutationResponse,
     PhoneNumberOrderResponse,
+    PhoneNumberReadResponse,
     PhoneNumberResponse,
     PhoneNumberStatus,
     ProvisionPhoneNumberRequest,
@@ -38,9 +40,9 @@ class PhoneNumbersResource(Resource):
             ),
         )
 
-    def retrieve(self, phone_number_id: str) -> PhoneNumberResponse:
+    def retrieve(self, phone_number_id: str) -> PhoneNumberReadResponse:
         return cast(
-            PhoneNumberResponse,
+            PhoneNumberReadResponse,
             self._request(
                 "GET", f"/v1/phone-numbers/{path_id('phone_number_id', phone_number_id)}"
             ),
@@ -77,9 +79,18 @@ class PhoneNumbersResource(Resource):
         payload: ProvisionPhoneNumberRequest,
         *,
         idempotency_key: str | None = None,
-    ) -> PhoneNumberResponse:
+    ) -> PhoneNumberMutationResponse:
+        """Sandbox: ``202`` with a simulated number.
+
+        Production rents nothing: the request creates a rental order and raises
+        ``TyxterAPIError`` 409 ``phone_number_rental_approval_required``, whose ``rental_order``
+        holds the order's ``id``, ``approval_url`` and ``expires_at``. Hand ``approval_url`` to
+        an organization owner or admin, then poll ``retrieve_order(rental_order["id"])``; do
+        not also call ``create_order``. Replaying the idempotency key of that request raises
+        the same 409 for the same order.
+        """
         return cast(
-            PhoneNumberResponse,
+            PhoneNumberMutationResponse,
             self._request(
                 "POST",
                 "/v1/phone-numbers/provision",
@@ -115,9 +126,9 @@ class PhoneNumbersResource(Resource):
         payload: ConnectPhoneNumberRequest,
         *,
         idempotency_key: str | None = None,
-    ) -> PhoneNumberResponse:
+    ) -> PhoneNumberMutationResponse:
         return cast(
-            PhoneNumberResponse,
+            PhoneNumberMutationResponse,
             self._request(
                 "POST",
                 "/v1/phone-numbers/connect",

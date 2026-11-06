@@ -313,3 +313,155 @@ def test_parses_optional_feedback_pointer() -> None:
         client._request("GET", "/v1/account")
 
     assert exc_info.value.feedback == {"endpoint": "/v1/feedback", "method": "POST"}
+
+
+_ORDER = {
+    "id": "pno_1",
+    "approval_url": "https://app.tyxter.test/phone-number-orders/approve?order_id=pno_1",
+    "expires_at": "2026-10-14T15:00:00.000Z",
+}
+_ACTIVE_SESSION = {
+    "id": "wls_123",
+    "expires_at": "2026-05-29T13:05:00.000Z",
+    "created_at": "2026-05-29T13:00:00.000Z",
+}
+_NO_VIEWS: dict[str, object] = {
+    "retryable": None,
+    "details": None,
+    "guard_reason": None,
+    "next_allowed_at": None,
+    "rental_order": None,
+    "service_window": None,
+}
+
+
+@pytest.mark.parametrize(
+    ("status", "error_fields", "expected_views"),
+    [
+        pytest.param(
+            400,
+            {"code": "service_window_required", "details": {**window, "extra": "kept"}},
+            {"service_window": {**window, "extra": "kept"}},
+            id=f"service-window-{window['reason']}",
+        )
+        for window in (
+            {"reason": "no_inbound", "last_inbound_at": None},
+            {"reason": "window_expired", "last_inbound_at": "2026-10-25T12:00:00.000-03:00"},
+            {"reason": "recipient_ambiguous", "last_inbound_at": None},
+        )
+    ]
+    + [
+        pytest.param(
+            400,
+            {"code": code, "details": details},
+            {},
+            id=f"no-service-window-{index}",
+        )
+        for index, (code, details) in enumerate(
+            (
+                ("recipient_duplicate_message", {"reason": "no_inbound", "last_inbound_at": None}),
+                ("future_error", {"reason": "no_inbound", "last_inbound_at": None}),
+                ("service_window_required", {"reason": "no_inbound"}),
+                ("service_window_required", {"last_inbound_at": None}),
+                ("service_window_required", {"reason": "unknown", "last_inbound_at": None}),
+                ("service_window_required", {"reason": "no_inbound", "last_inbound_at": 0}),
+            )
+        )
+    ]
+    + [
+        pytest.param(
+            400,
+            {
+                "code": "recipient_frequency_capped",
+                "details": {
+                    "next_allowed_at": "2026-09-09T12:00:00.000Z",
+                    "guard_reason": "provider_retry_floor",
+                },
+            },
+            {
+                "next_allowed_at": "2026-09-09T12:00:00.000Z",
+                "guard_reason": "provider_retry_floor",
+            },
+            id="recipient-guard-cooldown",
+        ),
+        pytest.param(
+            400,
+            {"code": "recipient_duplicate_message", "details": {"next_allowed_at": None}},
+            {},
+            id="recipient-guard-pending-send",
+        ),
+        pytest.param(
+            409,
+            {
+                "code": "webhook_listen_session_active_exists",
+                "details": {"active_session": _ACTIVE_SESSION},
+                "newer_server_field": "retained",
+            },
+            {"details": {"active_session": _ACTIVE_SESSION}},
+            id="listen-session-conflict",
+        ),
+        pytest.param(
+            409,
+            {"code": "phone_number_rental_approval_required", "details": {"order": _ORDER}},
+            {"rental_order": _ORDER},
+            id="rental-approval-required",
+        ),
+        pytest.param(
+            409,
+            {"code": "phone_number_order_expired", "details": {"order": _ORDER}},
+            {},
+            id="rental-order-shape-under-another-code",
+        ),
+        pytest.param(
+            409,
+            {
+                "code": "phone_number_rental_approval_required",
+                "details": {"active_session": _ACTIVE_SESSION},
+            },
+            {"details": {"active_session": _ACTIVE_SESSION}},
+            id="rental-code-with-another-variant",
+        ),
+        pytest.param(
+            402,
+            {
+                "type": "payment_required",
+                "code": "credit_balance_exhausted",
+                "retryable": False,
+                "details": {
+                    "top_up_url": "https://app.tyxter.test/billing",
+                    "reachable_routes": [{"method": "GET", "path": "/v1/billing/balance"}],
+                },
+            },
+            {"retryable": False},
+            id="credit-exhausted-stop-hint",
+        ),
+        pytest.param(
+            429,
+            {"type": "rate_limited", "code": "rate_limited", "retryable": True},
+            {},
+            id="only-false-is-a-stop-hint",
+        ),
+    ],
+)
+def test_api_error_exposes_typed_views_of_error_details(
+    status: int, error_fields: dict[str, object], expected_views: dict[str, object]
+) -> None:
+    error = {"type": "validation_error", "message": "Refused.", **error_fields}
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(status, json={"error": error})
+
+    client = Tyxter(
+        api_key="tx_sandbox_test",
+        base_url="https://api.test",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(TyxterAPIError) as exc_info:
+        client.messages.list()
+
+    raised = exc_info.value
+    views = {name: getattr(raised, name) for name in _NO_VIEWS}
+    assert views == {**_NO_VIEWS, **expected_views}
+    assert raised.raw_body == error
+    assert raised.body == {"error": error}

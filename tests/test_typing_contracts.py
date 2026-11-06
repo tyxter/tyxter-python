@@ -534,3 +534,136 @@ invalid_failure: MessageMediaTranscriptionFailedWebhookTranscript = {
     output = result.stdout + result.stderr
     assert 'Extra key "error_code"' in output
     assert 'Extra key "provider"' in output
+
+
+def test_parity_0_12_invalid_shapes_are_rejected(tmp_path: Path) -> None:
+    fixture = tmp_path / "invalid_parity_0_12_types.py"
+    fixture.write_text(
+        """\\
+from tyxter.types import (
+    GroupParticipantJoinedWebhookData,
+    GroupParticipantRemovedWebhookData,
+    MessageIdentity,
+    PurchaseBillingPackageRequest,
+    ReactionMessagePayload,
+    RenderedMessageWebhookSender,
+    ServiceWindowRequiredDetails,
+)
+
+pix_package: PurchaseBillingPackageRequest = {"package_code": "pkg", "payment_method": "pix"}
+
+joined: GroupParticipantJoinedWebhookData = {
+    "group_id": "grp_1",
+    "phone_number_id": "pn_1",
+    "participant": {"wa_id": "5511999999999"},
+    "participant_count": 1,
+    "occurred_at": "2026-11-06T12:00:00Z",
+    "initiated_by": "business",
+}
+
+removed: GroupParticipantRemovedWebhookData = {
+    "group_id": "grp_1",
+    "phone_number_id": "pn_1",
+    "participant": {"wa_id": "5511999999999"},
+    "participant_count": 0,
+    "occurred_at": "2026-11-06T12:00:00Z",
+}
+
+reaction: ReactionMessagePayload = {"message_id": "msg_1"}
+
+window: ServiceWindowRequiredDetails = {"reason": "closed", "last_inbound_at": None}
+
+request_identity: MessageIdentity = {
+    "type": "whatsapp_group",
+    "id": "grp_1",
+    "profile_name": "Ada",
+}
+
+group_reply_sender: RenderedMessageWebhookSender = {"type": "phone_e164", "id": "+5511"}
+""",
+        encoding="utf-8",
+    )
+    environment = os.environ.copy()
+    source_path = str(PACKAGE_ROOT / "src")
+    environment["MYPYPATH"] = (
+        source_path
+        if not environment.get("MYPYPATH")
+        else os.pathsep.join((source_path, environment["MYPYPATH"]))
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "mypy", "--strict", str(fixture)],
+        cwd=PACKAGE_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    output = result.stdout + result.stderr
+    assert 'TypedDict item "payment_method"' in output
+    assert 'Extra key "initiated_by"' in output
+    assert 'Missing key "initiated_by"' in output
+    assert 'Missing key "emoji"' in output
+    assert 'TypedDict item "reason"' in output
+    assert 'Extra key "profile_name" for TypedDict "MessageIdentity"' in output
+    assert 'Missing key "profile_name" for TypedDict "RenderedMessageWebhookSender"' in output
+
+
+def test_canonical_deprecations_reach_type_checkers(tmp_path: Path) -> None:
+    fixture = tmp_path / "deprecated_calls.py"
+    fixture.write_text(
+        """\\
+from tyxter import Tyxter
+from tyxter.message_builders import whatsapp_channel_media, whatsapp_channel_text
+
+client = Tyxter(api_key="tx_sandbox_test")
+client.whatsapp_channels.publish_text({"channel_id": "ch", "body": "x"})
+client.whatsapp_channels.publish_media({"channel_id": "ch", "media": {"kind": "image"}})
+whatsapp_channel_text({"channel_id": "ch", "body": "x"})
+whatsapp_channel_media({"channel_id": "ch", "media": {"kind": "image"}})
+client.billing.list_phone_renewals()
+client.billing.retrieve_phone_renewal("phr_1")
+""",
+        encoding="utf-8",
+    )
+    environment = os.environ.copy()
+    source_path = str(PACKAGE_ROOT / "src")
+    environment["MYPYPATH"] = (
+        source_path
+        if not environment.get("MYPYPATH")
+        else os.pathsep.join((source_path, environment["MYPYPATH"]))
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mypy",
+            "--strict",
+            "--enable-error-code",
+            "deprecated",
+            str(fixture),
+        ],
+        cwd=PACKAGE_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    output = result.stdout + result.stderr
+    deprecated = {
+        line.split(" is deprecated")[0].rsplit(" ", 1)[-1]
+        for line in output.splitlines()
+        if "[deprecated]" in line
+    }
+    assert deprecated == {
+        "tyxter.resources.channel_messages.WhatsAppChannelsResource.publish_text",
+        "tyxter.resources.channel_messages.WhatsAppChannelsResource.publish_media",
+        "tyxter.message_builders.whatsapp_channel_text",
+        "tyxter.message_builders.whatsapp_channel_media",
+        "tyxter.resources.billing.BillingResource.list_phone_renewals",
+        "tyxter.resources.billing.BillingResource.retrieve_phone_renewal",
+    }, output

@@ -5,7 +5,13 @@ from typing import Literal, TypeAlias
 from typing_extensions import NotRequired, TypedDict
 
 from .billing import TopupPaymentMethodKind
-from .common import Environment
+from .common import Environment, JSONObject
+from .messages import (
+    InboundMessageMediaDescriptor,
+    InboundUnknownDescriptor,
+    InboundUnsupportedDescriptor,
+    MessageContext,
+)
 
 WebhookEndpointStatus: TypeAlias = Literal["active", "disabled"]
 WebhookEndpointDisabledDetailFailureClass: TypeAlias = Literal[
@@ -16,6 +22,8 @@ WebhookEndpointDisabledDetailFailureClass: TypeAlias = Literal[
 class WebhookEndpointDisabledDetail(TypedDict):
     last_status_code: int | None
     failure_class: WebhookEndpointDisabledDetailFailureClass
+    # Present when three consecutive real delivery failures during probation re-tripped it.
+    probation_retrip: NotRequired[Literal[True]]
 
 
 class CreateWebhookEndpointRequest(TypedDict):
@@ -38,6 +46,12 @@ class WebhookEndpointResponse(TypedDict):
     description: str | None
     subscribed_events: list[str]
     status: WebhookEndpointStatus
+    # True after breaker recovery until the first successful real delivery.
+    probation: NotRequired[bool]
+    # Number of pending events currently held for this endpoint.
+    held_event_count: NotRequired[int]
+    # Creation time of the oldest currently held event; None when none are held.
+    oldest_held_event_at: NotRequired[str | None]
     disabled_reason: str | None
     disabled_detail: NotRequired[WebhookEndpointDisabledDetail | None]
     last_failure_at: str | None
@@ -84,14 +98,35 @@ class MessageWebhookIdentity(TypedDict):
     id: str
 
 
-class MessageWebhookData(TypedDict):
+class MessageWebhookSender(MessageWebhookIdentity):
+    """A ``message.*`` webhook sender with the captured inbound WhatsApp profile name.
+
+    ``profile_name`` is ``None`` for every sender except a resolved inbound WhatsApp sender with
+    captured evidence, and after privacy cleanup. It is not a verified identity. Newly rendered
+    events include it; already-stored webhook snapshots keep their original body and can lack
+    it, so it is ``NotRequired``.
+    """
+
+    profile_name: NotRequired[str | None]
+
+
+class RenderedMessageWebhookSender(MessageWebhookIdentity):
+    """The sender of an event type that has always carried ``profile_name``."""
+
+    profile_name: str | None
+
+
+class _MessageWebhookDataFields(TypedDict):
     message_id: str
     status: str
     channel: Literal["whatsapp", "instagram"]
-    sender: MessageWebhookIdentity
     recipient: MessageWebhookIdentity
     provider_message_id: str | None
     metadata: object | None
+
+
+class MessageWebhookData(_MessageWebhookDataFields):
+    sender: MessageWebhookSender
 
 
 class MessageMediaTranscribedWebhookTranscript(TypedDict):
@@ -129,6 +164,31 @@ class CreditToppedUpWebhookData(TypedDict):
 class CreditToppedUpWebhookEnvelope(_WebhookEventEnvelope):
     type: Literal["credit.topped_up"]
     data: CreditToppedUpWebhookData
+
+
+class CreditHardBlockLiftedWebhookData(TypedDict):
+    organization_id: str
+    # Four-decimal BRL amounts.
+    balance_brl: str
+    floor_brl: str
+    top_up_url: str
+
+
+CreditHardBlockTrigger: TypeAlias = Literal["usage", "phone_renewal", "reversal", "reconciliation"]
+
+
+class CreditHardBlockEngagedWebhookData(CreditHardBlockLiftedWebhookData):
+    trigger: CreditHardBlockTrigger
+
+
+class CreditHardBlockEngagedWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["credit.hard_block_engaged"]
+    data: CreditHardBlockEngagedWebhookData
+
+
+class CreditHardBlockLiftedWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["credit.hard_block_lifted"]
+    data: CreditHardBlockLiftedWebhookData
 
 
 class MessageMediaTranscribedWebhookEnvelope(_WebhookEventEnvelope):
@@ -190,3 +250,296 @@ class ProviderConnectionDisableScheduledWebhookData(TypedDict):
 class ProviderConnectionDisableScheduledWebhookEnvelope(_WebhookEventEnvelope):
     type: Literal["provider_connection.disable_scheduled"]
     data: ProviderConnectionDisableScheduledWebhookData
+
+
+class GroupMessageReceivedContentText(TypedDict):
+    body: str
+
+
+class GroupMessageReceivedContent(TypedDict):
+    type: str
+    text: NotRequired[GroupMessageReceivedContentText]
+    media: NotRequired[InboundMessageMediaDescriptor]
+    unsupported: NotRequired[InboundUnsupportedDescriptor]
+    unknown: NotRequired[InboundUnknownDescriptor]
+    interactive: NotRequired[JSONObject]
+    context: NotRequired[MessageContext]
+
+
+class GroupMessageReceivedRecipient(TypedDict):
+    type: Literal["whatsapp_group"]
+    id: str
+
+
+class GroupMessageReceivedWebhookData(TypedDict):
+    """A participant's message in a WhatsApp Business group (``group.message_received``)."""
+
+    message_id: str
+    status: str
+    channel: Literal["whatsapp", "instagram"]
+    sender: RenderedMessageWebhookSender
+    recipient: GroupMessageReceivedRecipient
+    provider_message_id: str | None
+    metadata: object | None
+    group_id: str
+    phone_number_id: str
+    content: NotRequired[GroupMessageReceivedContent]
+
+
+class GroupMessageReceivedWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["group.message_received"]
+    data: GroupMessageReceivedWebhookData
+
+
+# ``from`` is None when Meta withholds the reacting user's phone.
+MessageReaction = TypedDict(
+    "MessageReaction",
+    {
+        "emoji": str,
+        "removed": bool,
+        "from": str | None,
+        "reacted_message_id": str,
+    },
+)
+
+
+class MessageReactionReceivedWebhookData(_MessageWebhookDataFields):
+    """``message.reaction_received``: the reacted message's snapshot plus the reaction."""
+
+    sender: RenderedMessageWebhookSender
+    reaction: MessageReaction
+
+
+class MessageReactionReceivedWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["message.reaction_received"]
+    data: MessageReactionReceivedWebhookData
+
+
+GroupWebhookStatus: TypeAlias = Literal["pending", "active", "failed", "deleting", "deleted"]
+GroupWebhookEventType: TypeAlias = Literal[
+    "group.created",
+    "group.create_failed",
+    "group.deleted",
+    "group.delete_failed",
+    "group.invite_link_reset",
+    "group.invite_link_reset_failed",
+]
+
+
+class GroupWebhookProviderError(TypedDict, total=False):
+    """Meta's error detail on a group failure; Meta can omit any of these keys."""
+
+    message: str | None
+    type: str | None
+    code: int | str | None
+    error_subcode: int | str | None
+    error_data: object
+    fbtrace_id: str | None
+    error_user_title: str | None
+    error_user_msg: str | None
+
+
+class GroupWebhookFailure(TypedDict):
+    code: str
+    message: str
+    provider: GroupWebhookProviderError | None
+
+
+class GroupWebhookData(TypedDict):
+    """Data of the six WhatsApp Business group lifecycle events.
+
+    ``occurred_at`` is when Tyxter recorded the outcome. On the three ``*_failed`` events,
+    ``failure`` is the failure of the operation that failed, stored with the event; every other
+    field, and ``failure`` on the other three events, is the group as Tyxter reads it when it
+    sends the event (or serves it on a listen read), so a delayed or replayed event can show a
+    later state. ``invite_link`` lets anyone who has it join the group: store payloads as
+    secrets.
+    """
+
+    group_id: str
+    phone_number_id: str
+    status: GroupWebhookStatus
+    subject: str
+    provider_group_id: str | None
+    invite_link: str | None
+    failure: GroupWebhookFailure | None
+    occurred_at: str
+
+
+class GroupWebhookEnvelope(_WebhookEventEnvelope):
+    type: GroupWebhookEventType
+    data: GroupWebhookData
+
+
+class GroupWebhookParticipant(TypedDict):
+    wa_id: str
+
+
+GroupParticipantRemovalInitiator: TypeAlias = Literal["participant", "business"]
+
+
+class _GroupParticipantWebhookDataFields(TypedDict):
+    group_id: str
+    phone_number_id: str
+    participant: GroupWebhookParticipant
+    participant_count: int
+    occurred_at: str
+
+
+class GroupParticipantWebhookData(_GroupParticipantWebhookDataFields):
+    """Data of ``group.participant_joined`` and ``group.participant_removed``.
+
+    The join or removal as Tyxter recorded it, never the group's later state.
+    ``participant.wa_id`` is the participant's WhatsApp ID. ``occurred_at`` is Meta's time in
+    whole seconds (sandbox: the simulation time); the same participant, action and second
+    reported twice is one event. ``participant_count`` is Tyxter's count right after it applied
+    the change. ``initiated_by`` is present exactly on a removal.
+    """
+
+    initiated_by: NotRequired[GroupParticipantRemovalInitiator]
+
+
+class GroupParticipantJoinedWebhookData(_GroupParticipantWebhookDataFields):
+    """``group.participant_joined`` data; it never carries ``initiated_by``."""
+
+
+class GroupParticipantRemovedWebhookData(_GroupParticipantWebhookDataFields):
+    initiated_by: GroupParticipantRemovalInitiator
+
+
+class GroupParticipantJoinedWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["group.participant_joined"]
+    data: GroupParticipantJoinedWebhookData
+
+
+class GroupParticipantRemovedWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["group.participant_removed"]
+    data: GroupParticipantRemovedWebhookData
+
+
+GroupParticipantWebhookEnvelope: TypeAlias = (
+    GroupParticipantJoinedWebhookEnvelope | GroupParticipantRemovedWebhookEnvelope
+)
+
+
+PaymentWebhookEventType: TypeAlias = Literal[
+    "payment.created",
+    "payment.approval_available",
+    "payment.link_generated",
+    "payment.paid",
+    "payment.failed",
+    "payment.expired",
+    "payment.cancelled",
+]
+PaymentWebhookStatus: TypeAlias = Literal[
+    "link_pending", "link_generated", "paid", "failed", "expired", "cancelled"
+]
+TerminalPaymentWebhookStatus: TypeAlias = Literal["paid", "failed", "expired", "cancelled"]
+
+
+class _PaymentWebhookDataFields(TypedDict):
+    id: str
+    object: Literal["payment_request"]
+    # Legacy alias of ``id``, retained for existing integrations.
+    payment_request_id: str
+    amount_brl: str | None
+    currency: str
+    description: str | None
+    customer_name: str | None
+    customer_phone: str | None
+    customer_email: str | None
+    external_reference: str | None
+    metadata: object | None
+    provider: str | None
+    provider_payment_id: str | None
+    provider_approval_id: str | None
+    provider_event_id: NotRequired[str | None]
+    provider_event_type: NotRequired[str]
+    operation: NotRequired[str]
+    error_code: NotRequired[str]
+    error_message: NotRequired[str]
+    sandbox_simulator: NotRequired[bool]
+    sandbox_pay_page: NotRequired[bool]
+
+
+class PaymentWebhookData(_PaymentWebhookDataFields):
+    """Sanitized event-time snapshot shared by all merchant ``payment.*`` events."""
+
+    status: PaymentWebhookStatus
+    payment_link_url: str | None
+
+
+class PaymentCreatedWebhookData(_PaymentWebhookDataFields):
+    status: Literal["link_pending"]
+    payment_link_url: None
+
+
+class PaymentLinkGeneratedWebhookData(_PaymentWebhookDataFields):
+    status: Literal["link_generated"]
+    payment_link_url: str
+
+
+class PaymentPaidWebhookData(_PaymentWebhookDataFields):
+    status: Literal["paid"]
+    payment_link_url: str | None
+
+
+class PaymentFailedWebhookData(_PaymentWebhookDataFields):
+    status: Literal["failed"]
+    payment_link_url: str | None
+
+
+class PaymentExpiredWebhookData(_PaymentWebhookDataFields):
+    status: Literal["expired"]
+    payment_link_url: str | None
+
+
+class PaymentCancelledWebhookData(_PaymentWebhookDataFields):
+    status: Literal["cancelled"]
+    payment_link_url: str | None
+
+
+class PaymentCreatedWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["payment.created"]
+    data: PaymentCreatedWebhookData
+
+
+class PaymentApprovalAvailableWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["payment.approval_available"]
+    data: PaymentLinkGeneratedWebhookData
+
+
+class PaymentLinkGeneratedWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["payment.link_generated"]
+    data: PaymentLinkGeneratedWebhookData
+
+
+class PaymentPaidWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["payment.paid"]
+    data: PaymentPaidWebhookData
+
+
+class PaymentFailedWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["payment.failed"]
+    data: PaymentFailedWebhookData
+
+
+class PaymentExpiredWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["payment.expired"]
+    data: PaymentExpiredWebhookData
+
+
+class PaymentCancelledWebhookEnvelope(_WebhookEventEnvelope):
+    type: Literal["payment.cancelled"]
+    data: PaymentCancelledWebhookData
+
+
+PaymentWebhookEnvelope: TypeAlias = (
+    PaymentCreatedWebhookEnvelope
+    | PaymentApprovalAvailableWebhookEnvelope
+    | PaymentLinkGeneratedWebhookEnvelope
+    | PaymentPaidWebhookEnvelope
+    | PaymentFailedWebhookEnvelope
+    | PaymentExpiredWebhookEnvelope
+    | PaymentCancelledWebhookEnvelope
+)

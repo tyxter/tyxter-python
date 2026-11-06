@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing_extensions import deprecated
+
 from tyxter.types import (
     CreateMessageRequest,
     InstagramMediaMessageInput,
@@ -9,6 +11,7 @@ from tyxter.types import (
     MessageChannel,
     MessageIdentityType,
     MessageRecipient,
+    MessageReplyTo,
     OutboundMessage,
     StructuredPhoneInput,
     TemplateMessagePayload,
@@ -36,6 +39,7 @@ def whatsapp_text(input: WhatsAppTextMessageInput) -> CreateMessageRequest:
         recipient_id=input["to"],
         message={"type": "text", "text": text},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -48,6 +52,7 @@ def whatsapp_media(input: WhatsAppMediaMessageInput) -> CreateMessageRequest:
         recipient_id=input["to"],
         message={"type": "media", "media": input["media"]},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -61,6 +66,7 @@ def whatsapp_audio_from_text(input: WhatsAppTTSMessageInput) -> CreateMessageReq
         recipient_id=input["to"],
         message={"type": "media", "media": media},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -83,6 +89,7 @@ def whatsapp_template(input: WhatsAppTemplateMessageInput) -> CreateMessageReque
         recipient_id=input["to"],
         message={"type": "template", "template": template},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -95,6 +102,7 @@ def whatsapp_interactive(input: WhatsAppInteractiveMessageInput) -> CreateMessag
         recipient_id=input["to"],
         message={"type": "interactive", "interactive": input["interactive"]},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -107,6 +115,7 @@ def whatsapp_flow(input: WhatsAppFlowMessageInput) -> CreateMessageRequest:
         recipient_id=input["to"],
         message={"type": "flow", "flow": input["flow"]},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -137,7 +146,27 @@ def instagram_media(input: InstagramMediaMessageInput) -> CreateMessageRequest:
     )
 
 
+@deprecated(
+    "WhatsApp Channel publishing is unsupported: the API rejects this payload with "
+    "invalid_message_request. Use the whatsapp builders for one-to-one sends.",
+    category=None,
+)
 def whatsapp_channel_text(input: WhatsAppChannelTextMessageInput) -> CreateMessageRequest:
+    """Deprecated legacy builder; the API rejects its payload with invalid_message_request."""
+    return _whatsapp_channel_text(input)
+
+
+@deprecated(
+    "WhatsApp Channel publishing is unsupported: the API rejects this payload with "
+    "invalid_message_request. Use the whatsapp builders for one-to-one sends.",
+    category=None,
+)
+def whatsapp_channel_media(input: WhatsAppChannelMediaMessageInput) -> CreateMessageRequest:
+    """Deprecated legacy builder; the API rejects its payload with invalid_message_request."""
+    return _whatsapp_channel_media(input)
+
+
+def _whatsapp_channel_text(input: WhatsAppChannelTextMessageInput) -> CreateMessageRequest:
     text: TextMessagePayload = {"body": input["body"]}
     if "preview_url" in input:
         text["preview_url"] = input["preview_url"]
@@ -152,7 +181,7 @@ def whatsapp_channel_text(input: WhatsAppChannelTextMessageInput) -> CreateMessa
     )
 
 
-def whatsapp_channel_media(input: WhatsAppChannelMediaMessageInput) -> CreateMessageRequest:
+def _whatsapp_channel_media(input: WhatsAppChannelMediaMessageInput) -> CreateMessageRequest:
     return _request(
         channel="whatsapp_channel",
         sender_type="whatsapp_channel",
@@ -173,6 +202,7 @@ def _request(
     recipient_id: str | StructuredPhoneInput,
     message: OutboundMessage,
     metadata: JSONObject | None,
+    reply_to: MessageReplyTo | None = None,
 ) -> CreateMessageRequest:
     recipient: MessageRecipient
     if isinstance(recipient_id, str):
@@ -190,6 +220,8 @@ def _request(
         "recipient": recipient,
         "message": message,
     }
+    if reply_to is not None:
+        request["reply_to"] = reply_to
     if metadata is not None:
         request["metadata"] = metadata
     return request

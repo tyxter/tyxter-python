@@ -8,7 +8,9 @@ disagree.
 
 `tyxter-python` is the typed, synchronous Python SDK for [Tyxter Messaging](https://tyxter.com),
 built for both human developers and integrating agents. It is a downstream implementation of the
-canonical TypeScript/JavaScript SDK, [`@tyxter/sdk-js`](https://www.npmjs.com/package/@tyxter/sdk-js).
+canonical TypeScript/JavaScript SDK, published on npm as
+[`tyxter`](https://www.npmjs.com/package/tyxter) since 0.11.0. The former `@tyxter/sdk-js` package
+stops at 0.10.0.
 
 The canonical SDK source lives in Tyxter's private `tyxter-messaging` repository under
 `packages/sdk-js/`. The npm package proves what was actually published; the corresponding release
@@ -21,13 +23,13 @@ canonical SDK's capabilities and the API's exact wire behavior.
 
 ## Mandatory release parity
 
-Every published `@tyxter/sdk-js` release starts a Python parity update. The Python SDK must be
+Every published `tyxter` npm release starts a Python parity update. The Python SDK must be
 updated to the same version line; do not intentionally leave it behind or treat a conformance-only
 snapshot refresh as a completed update.
 
 At the start of SDK or release work:
 
-1. Run `npm view @tyxter/sdk-js version dist-tags --json` to learn what npm actually serves.
+1. Run `npm view tyxter version dist-tags --json` to learn what npm actually serves.
 2. Compare it with `src/tyxter/_version.py` and the latest Python changelog entry.
 3. In an authorized checkout of the private `tyxter-messaging` repository, locate the matching
    `sdk-js-v<version>` tag and read `packages/sdk-js/package.json`, `CHANGELOG.md`, `README.md`,

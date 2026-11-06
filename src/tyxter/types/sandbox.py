@@ -5,7 +5,7 @@ from typing import Literal, TypeAlias
 from typing_extensions import NotRequired, Required, TypedDict
 
 from .common import JSONObject
-from .messages import MediaMessagePayload, MessageChannel
+from .messages import MediaMessagePayload, MessageChannel, ReactionMessagePayload
 
 
 class SandboxInboundUnsupportedInput(TypedDict):
@@ -21,8 +21,13 @@ InboundSandboxMessageRequest = TypedDict(
     {
         "from": Required[str],
         "to": Required[str],
-        "type": Required[Literal["text", "media", "interactive", "flow", "unsupported", "unknown"]],
+        "type": Required[
+            Literal["text", "media", "interactive", "flow", "reaction", "unsupported", "unknown"]
+        ],
+        # Tyxter group id: `to` names its host phone number and `from` the participant.
+        "group_id": NotRequired[str],
         "channel": NotRequired[MessageChannel],
+        "reaction": NotRequired[ReactionMessagePayload],
         "text": NotRequired[dict[Literal["body"], str]],
         "media": NotRequired[MediaMessagePayload],
         "interactive": NotRequired[JSONObject],
@@ -82,6 +87,17 @@ class SandboxCapabilities(TypedDict):
     simulate_inbound: bool
     listen_for_webhooks: bool
     send_outbound_messages: bool
+    send_template_messages: NotRequired[bool]
+
+
+class SandboxDefaultTemplate(TypedDict):
+    name: str
+    language: str
+
+
+class SandboxTemplates(TypedDict):
+    approved_template_count: int
+    default_template: SandboxDefaultTemplate | None
 
 
 class SandboxQuickstartResponse(TypedDict):
@@ -90,6 +106,7 @@ class SandboxQuickstartResponse(TypedDict):
     api_key: SandboxAPIKey
     sender: SandboxSender
     webhooks: SandboxWebhooks
+    templates: NotRequired[SandboxTemplates]
     capabilities: SandboxCapabilities
     missing_scopes: list[str]
 

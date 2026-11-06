@@ -58,6 +58,43 @@ class SandboxPaymentStatusRequest(TypedDict):
     metadata: NotRequired[JSONObject]
 
 
+PaymentFeeCompletionState: TypeAlias = Literal["held", "settled", "released", "unresolved"]
+
+
+class PaymentFeeInitiation(TypedDict):
+    # Matches `payment_fee.reservation_id` on the ledger's payment initiation debit.
+    reservation_id: str
+    amount_brl: str
+    charged_at: str
+
+
+class PaymentFeeCompletion(TypedDict):
+    # Matches `payment_fee.reservation_id` on the ledger's hold, release and settlement.
+    reservation_id: str
+    # Fraction of the payment amount: "0.01" is 1%.
+    rate: str
+    amount_brl: str
+    state: PaymentFeeCompletionState
+    held_at: str
+    settled_at: str | None
+    released_at: str | None
+
+
+class PaymentFees(TypedDict):
+    """The payment-service fees of one accepted payment.
+
+    The same object appears on `PaymentResponse` and `AgenticPaymentResponse`. Amounts are
+    four-decimal strings, snapshotted at acceptance and never re-priced.
+    """
+
+    # True in sandbox: the amounts production would charge, with no balance movement.
+    simulated: bool
+    # Pricing version: the BRL rate card in force when the payment was accepted.
+    rate_card_id: str
+    initiation: PaymentFeeInitiation
+    completion: PaymentFeeCompletion
+
+
 class PaymentResponse(TypedDict):
     id: str
     object: Literal["payment_request"]
@@ -90,6 +127,10 @@ class PaymentResponse(TypedDict):
     failed_at: str | None
     expired_at: str | None
     cancelled_at: str | None
+    # None: no fee is owed. An Idempotency-Key replay returns its stored response, with `fees`
+    # as at the original call; read the payment for the current state. Absent only on such a
+    # replay stored before the field existed.
+    fees: NotRequired[PaymentFees | None]
 
 
 class ListPaymentsResponse(TypedDict):

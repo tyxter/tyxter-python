@@ -8,14 +8,16 @@ The SDK is alpha software. Additive response fields are compatible and are
 tolerated at runtime. Removing or renaming a public method, field, or stable
 `error.code` requires a deprecation cycle.
 
-Tyxter Python `0.8.0` is published on PyPI. Editing the version or these docs
-alone does not publish another package, create a tag, or change PyPI state;
-releases use the repository's Trusted Publishing workflow.
+The `0.12.0` source line is the release candidate for canonical `tyxter` 0.12.0,
+which npm publishes. PyPI serves `0.8.0` until the repository's Trusted
+Publishing workflow publishes this version. Editing the version or these docs
+alone does not publish another package, create a tag, or change PyPI state.
 
 ## Install
 
-Install the published SDK with `pip install tyxter`, or pin this release with
-`pip install tyxter==0.8.0`. To evaluate the current repository source instead,
+Install the published SDK with `pip install tyxter`, or pin the published
+release with `pip install tyxter==0.8.0`; neither includes the 0.12.0 candidate
+documented in this checkout. To evaluate the current repository source instead,
 install a checkout; doing so does not publish it:
 
 ```bash
@@ -142,6 +144,18 @@ unavailable. If the API returns `transcription_retry_rate_limited`, wait its
 `retry_after_ms` value and replay the same logical retry command with the same
 key. Use a fresh key only for a distinct retry command.
 
+Both `request_transcription()` and `retry_transcription()` accept optional
+advisory `prompt` and `keywords`. The server trims the prompt and rejects one
+longer than 1024 UTF-16 code units; `keywords` allows at most 50 trimmed terms of
+1–128 UTF-16 code units each, without CR, LF, U+2028, U+2029 or angle brackets,
+and keeps order, case and duplicates. Invalid hints return
+`invalid_transcription_request`; a request whose hints differ from the newest
+generation returns `transcription_hints_conflict`. A retry inherits omitted
+hints, and an empty prompt or keyword list clears that field. Hints never appear
+in transcript responses or webhooks. A keyed `request_transcription()` response,
+and its replay, carries `text: None`; read the text with
+`retrieve_transcription()`.
+
 Subscribe to both terminal events: `message.media_transcribed` and
 `message.media_transcription_failed`. The success event carries the transcript's
 speech, provider, model, and duration; the failure event is failure-safe and
@@ -201,6 +215,52 @@ TYXTER_WEBHOOK_SECRET=... \
 python examples/sandbox_send_and_verify.py
 ```
 
+## Replies, reactions, and WhatsApp Business group messages
+
+WhatsApp sends accept `reply_to={"message_id": ...}` on `messages.create()`, the
+`messages.send_*` helpers, every `whatsapp.send_*` helper, and the `whatsapp_*`
+builders in `tyxter.message_builders`. Use a Tyxter message ID in the same
+environment and conversation. The helpers keep the quote alongside metadata,
+idempotency keys and trace IDs.
+
+`messages.create()` also sends a reaction to an inbound WhatsApp message; an
+empty `emoji` removes it. Targets must be at most 30 days old and inside an open
+24-hour service window. Normal outbound billing applies, and a reaction's status
+stops at `sent`.
+
+```python
+client.messages.create(
+    {
+        "channel": "whatsapp",
+        "sender": {"type": "whatsapp_phone_number", "id": "pn_123"},
+        "recipient": {"type": "phone_e164", "id": "+5511999999999"},
+        "message": {
+            "type": "reaction",
+            "reaction": {"message_id": "msg_inbound_123", "emoji": "👍"},
+        },
+    },
+    idempotency_key="reaction-123",
+)
+```
+
+To send to an active WhatsApp Business group, use
+`{"type": "whatsapp_group", "id": "<Tyxter group id>"}` as the recipient and the
+phone number that hosts the group as the sender. Participant replies arrive as
+`group.message_received` (`GroupMessageReceivedWebhookEnvelope`). In sandbox,
+`sandbox.inbound_messages.create()` accepts `group_id`, with the host phone in
+`to` and the participant in `from`.
+
+Message reads and `message.*` webhook senders carry `profile_name`: the captured
+inbound WhatsApp profile name, not a verified identity or business display name.
+It is `None` on the default payload-less list, outbound and non-WhatsApp
+messages, phone-less rows and redacted rows. Already-stored webhook snapshots can
+lack it. Reads also carry `context` (`reply_to`, `forwarded`,
+`frequently_forwarded`), and an inbound sticker's `media.animated` is `True` or
+`False` when Meta sent the signal and omitted otherwise. A
+`message.reaction_received` event keeps the reacted message's snapshot and adds
+`data["reaction"]` with `emoji`, `removed`, `from` (`None` when Meta withholds the
+reacting phone) and `reacted_message_id`.
+
 ## Resources
 
 The client exposes snake-case resource namespaces:
@@ -214,8 +274,12 @@ The client exposes snake-case resource namespaces:
   `provider_credential_setup_sessions`
 - `rate_cards`, `sandbox`, `templates`, `usage`, `webhook_endpoints`, and
   `webhook_events`
-- channel-native conveniences: `whatsapp`, `instagram`, and
-  `whatsapp_channels`
+- channel-native conveniences: `whatsapp` and `instagram`. `whatsapp_channels`
+  and the `whatsapp_channel_*` builders are deprecated: WhatsApp Channel
+  publishing is unsupported and the API rejects them with
+  `invalid_message_request`. They are marked deprecated for type checkers (PEP 702)
+  and do not warn at runtime; they remain so existing imports and error handling
+  keep working.
 
 Request and response dictionaries are `TypedDict` contracts exported from
 `tyxter.types`. Write methods expose `idempotency_key` and `trace_id` only where
@@ -360,7 +424,22 @@ itself calls no provider. Read the resource again for the outcome.
   whose `status` is `read_failed` carries a `failure` and no facts.
 - `phone_numbers.create_order()` creates a rental order. In production it waits
   at `approval_url` for an organization owner or admin; no API key can approve
-  it, and nothing is charged before approval. Poll `retrieve_order()`.
+  it, and nothing is charged before approval. Poll `retrieve_order()`. A
+  production `phone_numbers.provision()` rents nothing: it raises
+  `TyxterAPIError` 409 `phone_number_rental_approval_required`, whose
+  `rental_order` holds the order's `id`, `approval_url` and `expires_at`; hand the
+  URL to an owner or admin and poll `retrieve_order()` rather than also calling
+  `create_order()`.
+- `provider_connections.exchange_meta_oauth()` and
+  `complete_meta_registration()` answer `202` with the connection and its
+  `operation` `queued` (`meta_oauth_exchange` or `meta_registration_completion`).
+  Poll `provider_connections.retrieve()` until `operation["state"]` is
+  `"succeeded"` or `"failed"`; on failure `operation["error_code"]` is the stable
+  code, such as `meta_oauth_exchange_failed` or `meta_payment_method_required`.
+  These Meta refusals no longer raise; refusals that need no Meta call still
+  raise `TyxterAPIError`. Phone `provision()`/`connect()` and these two methods
+  can return advisory display-name `warnings` with a stable `code`; they do not
+  block submission or predict Meta approval.
 - Salvy BYOK: `provider_connections.register_salvy()` returns a pending
   connection whose `salvy.operation` reports the worker's validation;
   `list_salvy_numbers()` reads the cached discovery snapshot, and
@@ -385,6 +464,38 @@ Top-up responses and `credit.topped_up` webhook events can report both `payment_
 omit `provider`, which the SDK never infers. There is no campaign, redemption, or promotion-creation
 operation in this SDK. A response `kind` of `"cash"` can coexist with the promotional discriminants;
 it does not establish cash settlement or a provider charge.
+
+## Billing, fees, and phone rental reads
+
+- `billing.balance()` returns `held_brl`, credit held by outstanding production
+  holds and already deducted from `balance_brl` (a hold is not spend), and
+  `production_blocked`, the production API-key credit policy.
+- Usage reads keep Tyxter billing apart from what Meta bills directly:
+  `usage.list_records()` rows carry nullable `estimated_external_meta_cost` with
+  the event-time Meta reference rate when one is available, and `usage.retrieve()`
+  and its buckets carry a separately marked aggregate with covered and
+  missing-reference quantities. Each is an estimate (`is_estimate: True`).
+- `billing.list_ledger()` rows are typed `LedgerEntryResponse`. `hold` and
+  `release` entries are payment completion-fee holds and their return; only
+  `debit` is spend. `payment_fee` names the payment and fee reservation.
+- Payment responses carry `fees` (`PaymentFees`): `initiation` is charged once and
+  `completion` is held until the outcome (`completion["state"]`). `simulated` is
+  `True` in sandbox, where nothing leaves the balance, and `fees` is `None` for a
+  payment charged none.
+- Package purchases are card-only: `payment_method` accepts only `"card"` (the
+  default), and `payment_method_id` selects a saved card.
+- Automatic top-up `enabled` can change without a write of yours: a failed
+  automatic top-up turns it `False`. `save_payment_method()` and
+  `set_default_payment_method()` turn back on only a configuration a failure
+  turned off, pointed at that card, and `update_auto_topup({"enabled": True, ...})`
+  turns it on as well. None of these charges immediately.
+- `phone_numbers.list()` and `retrieve()` return `PhoneNumberReadResponse` with
+  `renewal` (`PhoneRenewalSummary`): the number's current UTC month, with the next
+  charge in `next_renewal_at` and, on the free plan, the release instant in
+  `release_cutoff_at`. It is `None` for BYON and sandbox numbers.
+  `billing.list_phone_renewals()` and `retrieve_phone_renewal()` are deprecated
+  for type checkers: they return cycles recorded by the retired prepaid design,
+  and no new cycle is recorded.
 
 ## Pagination
 
@@ -436,11 +547,49 @@ except TyxterConnectionError as error:
     print("request did not receive an API response", error)
 ```
 
-`TyxterAPIError.body` preserves the original response. Internal errors may also
-include `error.feedback`, which points to the public feedback endpoint. A
-`route_not_found` response may instead include `error.discovery`, whose
-`openapi` and `well_known` relative paths describe the API host; read it from
-the raw body rather than expecting a separate exception attribute.
+`TyxterAPIError.body` preserves the original response, and `raw_body` is its
+complete `error` object typed as `TyxterWireErrorBody`. Errors the API marks as
+reportable include `error.feedback`, which points to the public feedback
+endpoint. A `route_not_found` response may instead include `error.discovery`,
+whose `openapi` and `well_known` relative paths describe the API host; read it
+from `raw_body` rather than expecting a separate exception attribute.
+
+Typed views of `error.details`:
+
+- `retryable` is `False` when the API sends the stop hint, for example on
+  `402 credit_balance_exhausted`: stop automatic retries until credit recovers.
+  `None` is not permission to retry. That refusal's `raw_body["details"]` is
+  `CreditBalanceExhaustedDetails` (`top_up_url`, `reachable_routes`).
+- `service_window` is `ServiceWindowRequiredDetails` (`reason` and nullable
+  `last_inbound_at`) on `service_window_required`, when the server supplied it.
+- `rental_order` is the order a `phone_number_rental_approval_required` refusal
+  created.
+- `next_allowed_at` and `guard_reason` come from recipient-guard refusals such as
+  `recipient_duplicate_message`. `next_allowed_at` is `None` both when absent and
+  while an earlier send is pending; `raw_body["details"]` tells them apart.
+- `details` is the listen-session conflict view
+  (`details["active_session"]`), set only on that conflict.
+
+The SDK never narrows `raw_body["details"]` by itself; check `error.code` before
+treating it as one variant:
+
+```python
+from typing import cast
+
+from tyxter import TyxterAPIError
+from tyxter.types import CreditBalanceExhaustedDetails
+
+try:
+    client.messages.list()
+except TyxterAPIError as error:
+    if error.retryable is False:
+        print("pause automatic retries", error.trace_id)
+    raw_details = error.raw_body.get("details") if error.raw_body is not None else None
+    if error.code == "credit_balance_exhausted" and raw_details is not None:
+        details = cast(CreditBalanceExhaustedDetails, raw_details)
+        print(details["top_up_url"])
+    raise
+```
 
 ## Webhook verification
 
@@ -482,6 +631,40 @@ def tyxter_webhook(request: HttpRequest) -> JsonResponse:
 ```
 
 Header names are case-insensitive. The default replay tolerance is 300 seconds.
+
+## Typed webhook events
+
+After verifying the signature, parse the raw body and annotate it with the
+matching envelope from `tyxter.types`:
+
+- `PaymentWebhookEnvelope` for the seven merchant `payment.*` events; narrow on
+  `event["type"]`.
+- `GroupWebhookEnvelope` for the six WhatsApp Business group lifecycle outcomes,
+  and `GroupParticipantWebhookEnvelope` for `group.participant_joined` /
+  `group.participant_removed` (`initiated_by` on a removal only). Lifecycle data
+  includes `invite_link`, which lets anyone who has it join the group: store
+  payloads as secrets.
+- `GroupMessageReceivedWebhookEnvelope` and
+  `MessageReactionReceivedWebhookEnvelope` for group replies and reactions.
+- `CreditHardBlockEngagedWebhookEnvelope` and
+  `CreditHardBlockLiftedWebhookEnvelope` for wallet hard-block changes.
+
+```python
+import json
+
+from tyxter.types import GroupParticipantWebhookEnvelope
+
+event: GroupParticipantWebhookEnvelope = json.loads(raw_body_bytes)
+if event["type"] == "group.participant_removed":
+    print(event["data"]["initiated_by"])
+print(event["data"]["participant"]["wa_id"], event["data"]["participant_count"])
+```
+
+Webhook endpoint reads add `held_event_count` and `oldest_held_event_at` for
+pending held events, and `probation` after breaker recovery until the first
+real delivery success; `disabled_detail["probation_retrip"]` marks a re-trip
+during probation. Delivery attempts carry `failure_class`, which is `None` on
+pending, successful, historical and unclassified attempts.
 
 ## Media capability URLs
 
@@ -536,7 +719,7 @@ that hits a route the manifest does not define fails, and a query parameter or
 `Idempotency-Key` mode (`unsupported`, `supported`, or `required`) that drifts
 from the contract fails.
 
-The current manifest at `e253e046739889d2bd2d32c4798e3864ba9f9290` classifies
+The current manifest at `a9142f6b52726629474fdc5c8afe21ff4687fb13` classifies
 all **206** rows: **198** have typed SDK routes, and **8** are reviewed
 exemptions. `PUT` and `GET /v1/media/blobs/:token` are capability-token routes:
 the signed token is their sole authority, so they are not bearer-authenticated
@@ -545,7 +728,9 @@ SDK routes. The other six are `GET` and `DELETE` under
 teaching-only refusals for a pasted personal WhatsApp invite link that the
 manifest itself declares have no SDK method; `groups.retrieve()` and
 `groups.delete()` percent-encode the id and reach the same `422`. The count is
-source-conformance evidence, not a publication claim.
+source-conformance evidence, not a publication claim. That commit is the
+`sdk-js-v0.12.0` release tag; the snapshots are byte-identical to the
+`e253e046739889d2bd2d32c4798e3864ba9f9290` copies they replace.
 
 **Do not hand-edit these files to make a test pass.** They are generated in the
 Tyxter Messaging repo, where they are verified against the mounted `v1`

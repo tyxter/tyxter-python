@@ -33,16 +33,21 @@ def test_billing_covers_manifest_routes_and_headers() -> None:
     client.billing.cancel_plan(idempotency_key="idem_cancel")
     client.billing.list_packages(limit=10, status="succeeded")
     client.billing.purchase_package(
-        {"package_code": "pkg_10k", "payment_method": "pix"},
+        {"package_code": "pkg_10k", "payment_method": "card", "payment_method_id": "pm_card_1"},
         idempotency_key="idem_purchase",
     )
     client.billing.list_payment_methods()
-    client.billing.save_payment_method({"payment_method_id": "pm_1"}, idempotency_key="idem_save")
+    client.billing.save_payment_method(
+        {"stripe_payment_method_id": "pm_1", "set_default": True}, idempotency_key="idem_save"
+    )
     client.billing.create_payment_method_setup_intent(idempotency_key="idem_setup")
     client.billing.set_default_payment_method("pm/1", idempotency_key="idem_default")
     client.billing.delete_payment_method("pm/1", idempotency_key="idem_delete")
     client.billing.retrieve_auto_topup()
-    client.billing.update_auto_topup({"enabled": True}, idempotency_key="idem_auto")
+    client.billing.update_auto_topup(
+        {"enabled": True, "threshold_brl": "10.0000", "amount_brl": "50.0000"},
+        idempotency_key="idem_auto",
+    )
     client.billing.list_ledger(environment="sandbox", source_type="usage")
     client.billing.list_invoices(project_id="prj_1")
     client.billing.download_invoice("inv/1")

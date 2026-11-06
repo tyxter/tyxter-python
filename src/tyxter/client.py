@@ -90,6 +90,8 @@ class Tyxter:
         self.messages = MessagesResource(self)
         self.whatsapp = WhatsAppMessagesResource(self.messages)
         self.instagram = InstagramMessagesResource(self.messages)
+        # Deprecated: WhatsApp Channel publishing is unsupported and the API rejects its calls
+        # with invalid_message_request. Kept so existing imports and error handling still work.
         self.whatsapp_channels = WhatsAppChannelsResource(self.messages)
         self.media = MediaResource(self)
         self.meta_signup_sessions = MetaSignupSessionsResource(self)

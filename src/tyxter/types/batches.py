@@ -58,6 +58,9 @@ class MessageBatchResponse(TypedDict):
     template_name: str | None
     recipient_count: int
     pacing: MessageBatchPacingResponse | None
+    # Recipients the recipient guard skipped. Included in `failed_count`; the failure export
+    # gives each one's guard reason.
+    recipient_guard_skipped_count: NotRequired[int]
     enqueued_count: int
     sent_count: int
     failed_count: int
@@ -83,6 +86,8 @@ class MessageBatchFailureExportRow(TypedDict):
     status: str
     error_code: str | None
     error_message: str | None
+    guard_reason: NotRequired[str]
+    next_allowed_at: NotRequired[str | None]
     created_at: str
     updated_at: str
 

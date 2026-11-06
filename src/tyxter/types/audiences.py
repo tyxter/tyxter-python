@@ -16,7 +16,7 @@ class AudienceContactRef(TypedDict):
 
 class CreateAudienceRequest(TypedDict):
     name: str
-    contact_ids: list[str]
+    contact_ids: NotRequired[list[str]]
     description: NotRequired[str | None]
 
 

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+import warnings
+from collections.abc import Callable
 from typing import cast
 
 import httpx
+import pytest
 
 from tyxter import Tyxter
+from tyxter.message_builders import whatsapp_channel_media, whatsapp_channel_text
+from tyxter.types import WhatsAppChannelMediaMessageInput, WhatsAppChannelTextMessageInput
 
 
 def make_client() -> tuple[Tyxter, list[httpx.Request]]:
@@ -268,3 +273,117 @@ def test_webhook_events_resource_covers_listen_inspect_and_resend_routes() -> No
     assert str(seen[6].url) == "https://api.test/v1/webhook-events/evt%2F1/resend"
     assert not seen[6].content
     assert body(seen[7]) == {"event_type": "message.failed", "limit": 25}
+
+
+_REPLY_TO = {"message_id": "msg_inbound_123"}
+_ROUTE = {"from": "pn_123", "to": "+15555550100", "reply_to": _REPLY_TO, "metadata": {"k": "v"}}
+_SEND_ROUTE = {
+    "channel": "whatsapp",
+    "sender": {"type": "whatsapp_phone_number", "id": "pn_123"},
+    "recipient": {"type": "whatsapp_group", "id": "grp_123"},
+    "reply_to": _REPLY_TO,
+    "metadata": {"k": "v"},
+}
+_TTS = {"type": "tts", "provider": "openai", "text": "oi", "voice": "alloy", "language": "pt"}
+_FLOW = {"type": "flow", "body": {"text": "Book"}, "action": {"name": "flow"}}
+_INTERACTIVE = {"type": "button", "body": {"text": "Pick"}, "action": {"buttons": []}}
+
+
+@pytest.mark.parametrize(
+    ("send", "message"),
+    [
+        pytest.param(
+            lambda client: client.whatsapp.send_text({**_ROUTE, "body": "hi"}),
+            {"type": "text", "text": {"body": "hi"}},
+            id="whatsapp.send_text",
+        ),
+        pytest.param(
+            lambda client: client.whatsapp.send_media(
+                {**_ROUTE, "media": {"kind": "image", "link": "https://x/y"}}
+            ),
+            {"type": "media", "media": {"kind": "image", "link": "https://x/y"}},
+            id="whatsapp.send_media",
+        ),
+        pytest.param(
+            lambda client: client.whatsapp.send_audio_from_text({**_ROUTE, "tts": _TTS}),
+            {"type": "media", "media": {"kind": "audio", "source": _TTS}},
+            id="whatsapp.send_audio_from_text",
+        ),
+        pytest.param(
+            lambda client: client.whatsapp.send_template(
+                {**_ROUTE, "name": "promo", "language": "pt_BR"}
+            ),
+            {"type": "template", "template": {"name": "promo", "language": "pt_BR"}},
+            id="whatsapp.send_template",
+        ),
+        pytest.param(
+            lambda client: client.whatsapp.send_interactive(
+                {**_ROUTE, "interactive": _INTERACTIVE}
+            ),
+            {"type": "interactive", "interactive": _INTERACTIVE},
+            id="whatsapp.send_interactive",
+        ),
+        pytest.param(
+            lambda client: client.whatsapp.send_flow({**_ROUTE, "flow": _FLOW}),
+            {"type": "flow", "flow": _FLOW},
+            id="whatsapp.send_flow",
+        ),
+        pytest.param(
+            lambda client: client.messages.send_text({**_SEND_ROUTE, "text": {"body": "hi"}}),
+            {"type": "text", "text": {"body": "hi"}},
+            id="messages.send_text",
+        ),
+    ],
+)
+def test_whatsapp_send_helpers_keep_the_quoted_message(
+    send: Callable[[Tyxter], object], message: dict[str, object]
+) -> None:
+    client, seen = make_client()
+
+    send(client)
+
+    sent = body(seen[0])
+    assert sent["reply_to"] == _REPLY_TO
+    assert sent["message"] == message
+    assert sent["metadata"] == {"k": "v"}
+
+
+_CHANNEL_TEXT: WhatsAppChannelTextMessageInput = {"channel_id": "channel_123", "body": "hello"}
+_CHANNEL_MEDIA: WhatsAppChannelMediaMessageInput = {
+    "channel_id": "channel_123",
+    "media": {"kind": "image", "link": "https://x/y"},
+}
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        pytest.param(
+            lambda client: whatsapp_channel_text(_CHANNEL_TEXT), id="whatsapp_channel_text"
+        ),
+        pytest.param(
+            lambda client: whatsapp_channel_media(_CHANNEL_MEDIA), id="whatsapp_channel_media"
+        ),
+        pytest.param(
+            lambda client: client.whatsapp_channels.publish_text(_CHANNEL_TEXT), id="publish_text"
+        ),
+        pytest.param(
+            lambda client: client.whatsapp_channels.publish_media(_CHANNEL_MEDIA),
+            id="publish_media",
+        ),
+        pytest.param(lambda client: client.billing.list_phone_renewals(), id="list_phone_renewals"),
+        pytest.param(
+            lambda client: client.billing.retrieve_phone_renewal("phr_1"),
+            id="retrieve_phone_renewal",
+        ),
+    ],
+)
+def test_deprecated_calls_do_not_warn_at_runtime(call: Callable[[Tyxter], object]) -> None:
+    # Canonical deprecates these through JSDoc only; Python signals type checkers, not runtime.
+    client, _ = make_client()
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        call(client)
+
+    assert [str(warning.message) for warning in caught] == []

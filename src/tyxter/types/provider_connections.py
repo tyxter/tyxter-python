@@ -5,6 +5,7 @@ from typing import Literal, TypeAlias
 from typing_extensions import NotRequired, Required, TypedDict
 
 from .common import Environment
+from .display_names import DisplayNameWarning
 
 ProviderName: TypeAlias = Literal["meta", "iniciador", "abacate_pay", "salvy"]
 ProviderConnectionStatus: TypeAlias = Literal["pending", "connected", "suspended", "disconnected"]
@@ -14,6 +15,7 @@ ProviderTokenSource: TypeAlias = Literal["manual", "embedded_signup"]
 ProviderConnectionChannel: TypeAlias = Literal[
     "whatsapp", "instagram", "payments", "agentic_payments", "phone_numbers"
 ]
+MetaConnectionChannel: TypeAlias = Literal["whatsapp", "instagram"]
 ProviderReadinessStatus: TypeAlias = Literal[
     "missing", "connected", "pending", "suspended", "disconnected", "selection_required"
 ]
@@ -94,8 +96,73 @@ class RegisterSalvyConnectionRequest(TypedDict):
     continuation_terms_version: Literal["salvy_byok_v1"]
 
 
+ApiKeyRegisterSalvyConnectionRequest: TypeAlias = RegisterSalvyConnectionRequest
+DashboardBffRegisterSalvyConnectionRequest: TypeAlias = RegisterSalvyConnectionRequest
+
+
 class RotateSalvyConnectionRequest(TypedDict):
     api_key: str
+
+
+ApiKeyRotateSalvyConnectionRequest: TypeAlias = RotateSalvyConnectionRequest
+DashboardBffRotateSalvyConnectionRequest: TypeAlias = RotateSalvyConnectionRequest
+
+# The worker operation behind an asynchronous connect: a Meta Embedded Signup OAuth code
+# exchange (`exchange_meta_oauth`), a Meta complete-registration
+# (`complete_meta_registration`), a Meta registration made internally, a legacy Meta token
+# rotation, or an Iniciador agentic registration made in the dashboard.
+ProviderConnectionOperationKind: TypeAlias = Literal[
+    "meta_registration",
+    "meta_token_rotation",
+    "meta_oauth_exchange",
+    "meta_registration_completion",
+    "iniciador_agentic_registration",
+]
+# Why a provider-connection operation failed: the stable code the same route answered
+# synchronously before its provider call moved to a worker. `meta_validation_failed` also
+# covers a registration, rotation or complete-registration the worker could not finish in time,
+# `meta_oauth_exchange_unavailable` an OAuth code exchange, and `agentic_provider_unavailable`
+# an agentic registration; a retry can succeed.
+ProviderConnectionOperationErrorCode: TypeAlias = Literal[
+    "whatsapp_credentials_invalid",
+    "instagram_credentials_invalid",
+    "missing_whatsapp_scopes",
+    "meta_token_foreign_app",
+    "meta_phone_number_not_accessible",
+    "meta_instagram_page_not_accessible",
+    "meta_waba_phone_mismatch",
+    "meta_instagram_account_mismatch",
+    "meta_validation_failed",
+    "meta_identity_enforced",
+    "meta_phone_number_already_connected",
+    "meta_signup_connection_exists",
+    "provider_connection_policy_suspended",
+    "missing_meta_app_credentials",
+    "invalid_provider_connection_request",
+    "invalid_environment",
+    "meta_oauth_exchange_failed",
+    "meta_oauth_exchange_unavailable",
+    "meta_waba_missing",
+    "meta_phone_number_missing",
+    "meta_connection_reauthorization_required",
+    "meta_messaging_permission_missing",
+    "meta_payment_method_required",
+    "meta_phone_pin_mismatch",
+    "meta_phone_platform_unsupported",
+    "meta_phone_registration_forbidden",
+    "agentic_provider_unauthorized",
+    "agentic_provider_unavailable",
+    "unsafe_iniciador_agentic_api_base_url",
+]
+
+
+class ProviderConnectionOperation(TypedDict):
+    kind: ProviderConnectionOperationKind
+    # `queued` until the worker finishes; poll `retrieve` until `succeeded` or `failed`.
+    state: Literal["queued", "succeeded", "failed"]
+    # Set only when `state` is `failed`.
+    error_code: ProviderConnectionOperationErrorCode | None
+    updated_at: str
 
 
 class SalvyNumberResponse(TypedDict):
@@ -141,6 +208,14 @@ class ProviderConnectionResponse(TypedDict):
     provider_account_id: str | None
     # Customer-owned Salvy discovery state; None for every non-Salvy connection.
     salvy: NotRequired[SalvyConnectionInfo | None]
+    # The worker operation behind an asynchronous connect, token rotation or
+    # complete-registration. `exchange_meta_oauth` and `complete_meta_registration` answer with
+    # it `queued`; poll `retrieve` until it is `succeeded` (the connection is `connected`) or
+    # `failed` (`error_code` says why). None when the connection never ran one, or when a later
+    # credential write replaced a queued one; a newer registration, code exchange, rotation or
+    # complete-registration replaces a queued one, so `kind` can change while you poll. Absent
+    # from older API images.
+    operation: NotRequired[ProviderConnectionOperation | None]
     payment_receiver: PaymentReceiverProfile | None
     payment_capabilities: PaymentProviderCapabilities | None
     agentic_capabilities: AgenticPaymentProviderCapabilities | None
@@ -167,6 +242,16 @@ class ProviderConnectionResponse(TypedDict):
     created_at: str
     updated_at: str
     disconnected_at: str | None
+
+
+class MetaConnectionMutationResponse(ProviderConnectionResponse):
+    """The `202` connection returned by `exchange_meta_oauth()` and `complete_meta_registration()`.
+
+    `warnings` carries advisory display-name suggestions only for a `display_name` the request
+    supplied; it may be absent on older cached idempotency responses.
+    """
+
+    warnings: NotRequired[list[DisplayNameWarning]]
 
 
 class DeleteProviderConnectionResponse(TypedDict):
@@ -197,11 +282,27 @@ class PaymentsChannelReadiness(TypedDict):
     reason: str | None
 
 
+class AgenticPlatformDefaultStatus(TypedDict):
+    """Managed agentic-payments app availability, not connected readiness.
+
+    `configured` reports managed app configuration, `active` stored-row ownership and `kyc`
+    production KYC eligibility. A disconnected slot can recover on first agentic use.
+    """
+
+    configured: bool
+    active: bool
+    kyc: Literal["approved", "pending", "required"] | None
+
+
+class AgenticPaymentsChannelReadiness(MessagingChannelReadiness):
+    platform_default: NotRequired[AgenticPlatformDefaultStatus]
+
+
 class ProviderConnectionChannels(TypedDict):
     whatsapp: MessagingChannelReadiness
     instagram: MessagingChannelReadiness
     payments: PaymentsChannelReadiness
-    agentic_payments: MessagingChannelReadiness
+    agentic_payments: AgenticPaymentsChannelReadiness
 
 
 class ProviderConnectionStatusResponse(TypedDict):
