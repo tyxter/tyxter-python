@@ -172,6 +172,11 @@ user explicitly authorizes that release action and target. Never run a manual Py
 repository workflow uses Trusted Publishing and verifies main ancestry, version/channel agreement,
 the full Python matrix, package contents, and duplicate-release state.
 
+The workflow refuses to upload a version without a non-empty `## [<version>]` section in
+`CHANGELOG.md`. After the PyPI upload it creates the GitHub release `v<version>` from that
+section (a prerelease for alpha versions); a manual dispatch creates one only when tag `v<version>`
+already points at the published commit, and a rerun keeps an existing release.
+
 Preserve unrelated user changes. Do not discard edits, rewrite history, force-push, or use
 destructive Git commands. Do not commit, push, or open a PR unless requested or required by the
 active workflow. Before handoff, review `git diff` and `git status` for scope, artifacts, and
