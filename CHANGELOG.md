@@ -14,6 +14,14 @@ published JavaScript tag in these notes.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.12.0.post1] - 2026-11-06
+
+A documentation and metadata release. The SDK code is identical to 0.12.0 and still matches canonical
+`tyxter` 0.12.0 on npm; this upload exists to replace the 0.12.0 PyPI page, which showed the
+pre-release README.
+
 ### Documentation
 
 - The README no longer describes 0.12.0 as an unpublished candidate or says PyPI serves 0.8.0.
