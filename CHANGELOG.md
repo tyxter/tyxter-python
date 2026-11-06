@@ -40,7 +40,7 @@ are byte-identical to the vendored copies. These entries do not claim parity wit
 
 ### Added
 
-- Beta WhatsApp Business groups: `groups.retrieve_eligibility()`,
+- WhatsApp Business groups: `groups.retrieve_eligibility()`,
   `groups.create_eligibility_check()`, `groups.create()`, `groups.list()`, `groups.retrieve()`,
   `groups.delete()`, `groups.reset_invite_link()`, and
   `sandbox.groups.simulate_participant()`, with `GroupResponse`, `GroupEligibilityResponse`,

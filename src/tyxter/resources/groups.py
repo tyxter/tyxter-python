@@ -15,7 +15,7 @@ from ._base import Resource, path_id
 
 
 class GroupsResource(Resource):
-    """WhatsApp Business groups (beta). Never personal WhatsApp groups.
+    """WhatsApp Business groups. Never personal WhatsApp groups.
 
     Every write is accepted asynchronously; none of these calls reaches Meta.
     """

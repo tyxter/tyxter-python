@@ -366,9 +366,12 @@ itself calls no provider. Read the resource again for the outcome.
   `list_salvy_numbers()` reads the cached discovery snapshot, and
   `phone_numbers.import_salvy()` imports one number from it.
   `billing.list_phone_management()` reports management coverage and charges.
-- `groups` (beta) manages WhatsApp Business groups created through Meta's Groups
-  API, never personal WhatsApp groups. `groups.create()` returns a `pending`
-  group, which stays `pending` until Meta's create outcome arrives. In sandbox,
+- `groups` manages WhatsApp Business groups created through Meta's Groups API,
+  never personal WhatsApp groups. `groups.create()` returns a `pending` group,
+  and a Tyxter worker resolves the create, as `active` or as `failed` with a
+  `failure.code`. A create the worker cannot send fails without any Meta call.
+  A production create Meta accepts stays `pending` until Meta reports the
+  outcome, and stays `pending` if that outcome never arrives. In sandbox,
   `sandbox.groups.simulate_participant()` simulates members joining and leaving.
 - `payments.cancel()` queues hosted-checkout cancellation and returns the current
   payment; poll `retrieve()` until the provider confirms a terminal status.
