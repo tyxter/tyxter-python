@@ -274,9 +274,10 @@ The client exposes snake-case resource namespaces:
   `webhook_events`
 - channel-native conveniences: `whatsapp` and `instagram`. `whatsapp_channels`
   and the `whatsapp_channel_*` builders are deprecated: WhatsApp Channel
-  publishing is unsupported, the API rejects them with `invalid_message_request`,
-  and calling them emits a `DeprecationWarning`. They remain so existing imports
-  and error handling keep working.
+  publishing is unsupported and the API rejects them with
+  `invalid_message_request`. They are marked deprecated for type checkers (PEP 702)
+  and do not warn at runtime; they remain so existing imports and error handling
+  keep working.
 
 Request and response dictionaries are `TypedDict` contracts exported from
 `tyxter.types`. Write methods expose `idempotency_key` and `trace_id` only where
@@ -467,6 +468,11 @@ it does not establish cash settlement or a provider charge.
 - `billing.balance()` returns `held_brl`, credit held by outstanding production
   holds and already deducted from `balance_brl` (a hold is not spend), and
   `production_blocked`, the production API-key credit policy.
+- Usage reads keep Tyxter billing apart from what Meta bills directly:
+  `usage.list_records()` rows carry nullable `estimated_external_meta_cost` with
+  the event-time Meta reference rate when one is available, and `usage.retrieve()`
+  and its buckets carry a separately marked aggregate with covered and
+  missing-reference quantities. Each is an estimate (`is_estimate: True`).
 - `billing.list_ledger()` rows are typed `LedgerEntryResponse`. `hold` and
   `release` entries are payment completion-fee holds and their return; only
   `debit` is spend. `payment_fee` names the payment and fee reservation.
@@ -486,8 +492,8 @@ it does not establish cash settlement or a provider charge.
   charge in `next_renewal_at` and, on the free plan, the release instant in
   `release_cutoff_at`. It is `None` for BYON and sandbox numbers.
   `billing.list_phone_renewals()` and `retrieve_phone_renewal()` are deprecated
-  and emit a `DeprecationWarning`: they return cycles recorded by the retired
-  prepaid design, and no new cycle is recorded.
+  for type checkers: they return cycles recorded by the retired prepaid design,
+  and no new cycle is recorded.
 
 ## Pagination
 
@@ -576,8 +582,9 @@ try:
 except TyxterAPIError as error:
     if error.retryable is False:
         print("pause automatic retries", error.trace_id)
-    if error.code == "credit_balance_exhausted" and error.raw_body is not None:
-        details = cast(CreditBalanceExhaustedDetails, error.raw_body.get("details"))
+    raw_details = error.raw_body.get("details") if error.raw_body is not None else None
+    if error.code == "credit_balance_exhausted" and raw_details is not None:
+        details = cast(CreditBalanceExhaustedDetails, raw_details)
         print(details["top_up_url"])
     raise
 ```

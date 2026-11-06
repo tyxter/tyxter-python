@@ -23,11 +23,23 @@ below is published behavior. Once npm publishes 0.12.0 from that source, this he
 snapshots (synced from `e253e046739889d2bd2d32c4798e3864ba9f9290`) are byte-identical to the
 target's.
 
-Python conventions: fields the canonical SDK added to an already-published response type are
-`NotRequired` here even where the canonical type requires them, so existing response
-constructors keep type-checking; current API reads include them. Canonical inline shapes get
-exported names. The canonical runtime suffix on the User-Agent is not ported: the API
-classifies Python SDK requests only when the header is exactly `tyxter-python/<version>`.
+Python conventions and the deliberate differences from canonical:
+
+- Fields the canonical SDK added to an already-published response type are `NotRequired` here,
+  even where the canonical type requires them, so existing response constructors keep
+  type-checking; current API reads include them. Brand-new types mirror canonical exactly.
+- `PhoneNumberReadResponse.renewal` stays `NotRequired`, although reads always include it, and
+  `PhoneNumberMutationResponse` keeps the inherited optional `renewal`, although mutation
+  responses never carry it. A TypedDict subclass can neither make an inherited key required nor
+  drop it, and a sibling type would break `PhoneNumberResponse` annotations on these methods.
+- `TyxterAPIError.next_allowed_at` is `None` both when the details omit it and when the API sent
+  `null`, where canonical keeps `undefined` and `null` apart; `raw_body["details"]` tells the
+  two apart.
+- Deprecations are type-checker signals only (PEP 702 `@deprecated(..., category=None)`),
+  matching canonical JSDoc `@deprecated`; nothing warns at runtime.
+- Canonical inline shapes get exported names. The canonical runtime suffix on the User-Agent is
+  not ported: the API classifies Python SDK requests only when the header is exactly
+  `tyxter-python/<version>`.
 
 ### Removed (breaking)
 
@@ -99,14 +111,14 @@ classifies Python SDK requests only when the header is exactly `tyxter-python/<v
 ### Deprecated
 
 - `whatsapp_channels.publish_text()` / `publish_media()` and the `whatsapp_channel_text()` /
-  `whatsapp_channel_media()` builders emit a `DeprecationWarning`. WhatsApp Channel publishing is
-  unsupported and the API rejects these payloads with `invalid_message_request`; the methods,
-  builders, `WhatsAppChannelsResource` and the `whatsapp_channels` attribute remain so existing
-  imports and error handling keep working.
-- `billing.list_phone_renewals()` and `billing.retrieve_phone_renewal()` emit a
-  `DeprecationWarning`. They keep returning cycles recorded by the retired prepaid renewal
-  design; no new cycle is recorded. Read `renewal` on phone-number reads instead. No removal
-  date is set.
+  `whatsapp_channel_media()` builders are marked deprecated for type checkers. WhatsApp Channel
+  publishing is unsupported and the API rejects these payloads with `invalid_message_request`;
+  the methods, builders, `WhatsAppChannelsResource` and the `whatsapp_channels` attribute remain
+  so existing imports and error handling keep working.
+- `billing.list_phone_renewals()` and `billing.retrieve_phone_renewal()` are marked deprecated
+  for type checkers. They keep returning cycles recorded by the retired prepaid renewal design;
+  no new cycle is recorded. Read `renewal` on phone-number reads instead. No removal date is
+  set.
 
 ### Added
 
@@ -184,8 +196,15 @@ classifies Python SDK requests only when the header is exactly `tyxter-python/<v
 
 ### Fixed
 
+- `messages.send_*`, `whatsapp.send_*` and the `whatsapp_*` builders silently dropped a
+  `reply_to` key, so the message went out without its quote; they now send it.
 - The `messages.send_*` inputs accept every `MessageRecipient`, including a structured phone
   recipient, instead of only `MessageIdentity`.
+- Response fields canonical has had since before 0.4 and Python never typed:
+  `estimated_external_meta_cost` on usage records, summaries and summary buckets
+  (`EstimatedExternalMetaCost`, `EstimatedExternalMetaCostSummary`), and `templates` and
+  `capabilities.send_template_messages` on `sandbox.quickstart()`. They are `NotRequired`.
+- `CreateAudienceRequest.contact_ids` is optional, as the API and canonical allow.
 - `MetaSignupSessionResponse` types the `"failed"` status and the optional `error`
   (`MetaSignupFailure`: `code` `meta_signup_session_expired`, `reason`, `message` and a `feedback`
   pointer) that `meta_signup_sessions.retrieve()` returns when a hosted signup handoff fails. Start a
