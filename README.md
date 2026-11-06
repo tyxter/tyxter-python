@@ -8,17 +8,21 @@ The SDK is alpha software. Additive response fields are compatible and are
 tolerated at runtime. Removing or renaming a public method, field, or stable
 `error.code` requires a deprecation cycle.
 
-The `0.12.0` source line is the release candidate for canonical `tyxter` 0.12.0,
-which npm publishes. PyPI serves `0.8.0` until the repository's Trusted
-Publishing workflow publishes this version. Editing the version or these docs
-alone does not publish another package, create a tag, or change PyPI state.
+The package is published on PyPI as [`tyxter`](https://pypi.org/project/tyxter/).
+Each version matches the canonical JavaScript SDK version on npm
+([`tyxter`](https://www.npmjs.com/package/tyxter)); release notes are in
+[`CHANGELOG.md`](https://github.com/tyxter/tyxter-python/blob/main/CHANGELOG.md) and on the
+[releases page](https://github.com/tyxter/tyxter-python/releases).
 
 ## Install
 
-Install the published SDK with `pip install tyxter`, or pin the published
-release with `pip install tyxter==0.8.0`; neither includes the 0.12.0 candidate
-documented in this checkout. To evaluate the current repository source instead,
-install a checkout; doing so does not publish it:
+Install the published SDK from [PyPI](https://pypi.org/project/tyxter/):
+
+```bash
+pip install tyxter
+```
+
+To evaluate unreleased changes on `main`, install a checkout instead:
 
 ```bash
 git clone https://github.com/tyxter/tyxter-python.git
