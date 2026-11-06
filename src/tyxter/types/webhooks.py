@@ -110,14 +110,23 @@ class MessageWebhookSender(MessageWebhookIdentity):
     profile_name: NotRequired[str | None]
 
 
-class MessageWebhookData(TypedDict):
+class RenderedMessageWebhookSender(MessageWebhookIdentity):
+    """The sender of an event type that has always carried ``profile_name``."""
+
+    profile_name: str | None
+
+
+class _MessageWebhookDataFields(TypedDict):
     message_id: str
     status: str
     channel: Literal["whatsapp", "instagram"]
-    sender: MessageWebhookSender
     recipient: MessageWebhookIdentity
     provider_message_id: str | None
     metadata: object | None
+
+
+class MessageWebhookData(_MessageWebhookDataFields):
+    sender: MessageWebhookSender
 
 
 class MessageMediaTranscribedWebhookTranscript(TypedDict):
@@ -268,7 +277,7 @@ class GroupMessageReceivedWebhookData(TypedDict):
     message_id: str
     status: str
     channel: Literal["whatsapp", "instagram"]
-    sender: MessageWebhookSender
+    sender: RenderedMessageWebhookSender
     recipient: GroupMessageReceivedRecipient
     provider_message_id: str | None
     metadata: object | None
@@ -294,9 +303,10 @@ MessageReaction = TypedDict(
 )
 
 
-class MessageReactionReceivedWebhookData(MessageWebhookData):
+class MessageReactionReceivedWebhookData(_MessageWebhookDataFields):
     """``message.reaction_received``: the reacted message's snapshot plus the reaction."""
 
+    sender: RenderedMessageWebhookSender
     reaction: MessageReaction
 
 

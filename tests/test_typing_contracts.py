@@ -543,10 +543,11 @@ def test_parity_0_12_invalid_shapes_are_rejected(tmp_path: Path) -> None:
 from tyxter.types import (
     GroupParticipantJoinedWebhookData,
     GroupParticipantRemovedWebhookData,
+    MessageIdentity,
     PurchaseBillingPackageRequest,
     ReactionMessagePayload,
+    RenderedMessageWebhookSender,
     ServiceWindowRequiredDetails,
-    WhatsAppGroupRecipientIdentity,
 )
 
 pix_package: PurchaseBillingPackageRequest = {"package_code": "pkg", "payment_method": "pix"}
@@ -572,11 +573,13 @@ reaction: ReactionMessagePayload = {"message_id": "msg_1"}
 
 window: ServiceWindowRequiredDetails = {"reason": "closed", "last_inbound_at": None}
 
-group: WhatsAppGroupRecipientIdentity = {
+request_identity: MessageIdentity = {
     "type": "whatsapp_group",
     "id": "grp_1",
     "profile_name": "Ada",
 }
+
+group_reply_sender: RenderedMessageWebhookSender = {"type": "phone_e164", "id": "+5511"}
 """,
         encoding="utf-8",
     )
@@ -604,7 +607,8 @@ group: WhatsAppGroupRecipientIdentity = {
     assert 'Missing key "initiated_by"' in output
     assert 'Missing key "emoji"' in output
     assert 'TypedDict item "reason"' in output
-    assert 'Extra key "profile_name"' in output
+    assert 'Extra key "profile_name" for TypedDict "MessageIdentity"' in output
+    assert 'Missing key "profile_name" for TypedDict "RenderedMessageWebhookSender"' in output
 
 
 def test_canonical_deprecations_reach_type_checkers(tmp_path: Path) -> None:

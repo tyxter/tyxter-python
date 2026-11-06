@@ -629,6 +629,7 @@ from .webhooks import (
     ProviderConnectionDisableScheduledWebhookEnvelope,
     ProviderConnectionPolicyWarningWebhookData,
     ProviderConnectionPolicyWarningWebhookEnvelope,
+    RenderedMessageWebhookSender,
     RotateWebhookSigningSecretResponse,
     TerminalPaymentWebhookStatus,
     TestWebhookEndpointResponse,
@@ -1228,4 +1229,5 @@ __all__ = [
     "GroupWebhookProviderError",
     "SandboxDefaultTemplate",
     "SandboxTemplates",
+    "RenderedMessageWebhookSender",
 ]
