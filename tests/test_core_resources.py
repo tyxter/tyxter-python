@@ -57,9 +57,10 @@ def test_channel_resources_build_canonical_message_requests() -> None:
         trace_id="trc_wa",
     )
     client.instagram.send_text({"account_id": "ig_123", "user_id": "igsid_456", "body": "hello"})
-    client.whatsapp_channels.publish_media(
-        {"channel_id": "channel_123", "media": {"kind": "image", "link": "https://x/y"}}
-    )
+    with pytest.warns(DeprecationWarning, match="WhatsApp Channel publishing is unsupported"):
+        client.whatsapp_channels.publish_media(
+            {"channel_id": "channel_123", "media": {"kind": "image", "link": "https://x/y"}}
+        )
 
     assert body(seen[0]) == {
         "channel": "whatsapp",

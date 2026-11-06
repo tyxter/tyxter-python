@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import cast
 
+from typing_extensions import deprecated
+
 from tyxter.types import (
     AutoTopupConfigResponse,
     BillingPackageStatus,
@@ -30,6 +32,11 @@ from tyxter.types import (
 )
 
 from ._base import Resource, path_id
+
+_PHONE_RENEWALS_DEPRECATION = (
+    "Phone renewal history is retired: no new cycle is recorded. Read `renewal` on "
+    "phone_numbers.list() or phone_numbers.retrieve() for each number's current month."
+)
 
 
 class BillingResource(Resource):
@@ -226,6 +233,7 @@ class BillingResource(Resource):
             ),
         )
 
+    @deprecated(_PHONE_RENEWALS_DEPRECATION)
     def list_phone_renewals(
         self,
         *,
@@ -233,6 +241,11 @@ class BillingResource(Resource):
         starting_after: str | None = None,
         status: PhoneRenewalStatus | None = None,
     ) -> ListPhoneRenewalsResponse:
+        """Deprecated: list renewal cycles recorded by the retired prepaid renewal design.
+
+        The route keeps answering, but no new cycle is recorded. Read ``renewal`` on
+        ``phone_numbers.list()`` / ``phone_numbers.retrieve()`` instead. No removal date is set.
+        """
         return cast(
             ListPhoneRenewalsResponse,
             self._request(
@@ -242,7 +255,9 @@ class BillingResource(Resource):
             ),
         )
 
+    @deprecated(_PHONE_RENEWALS_DEPRECATION)
     def retrieve_phone_renewal(self, cycle_id: str) -> PhoneRenewalResponse:
+        """Deprecated: read ``renewal`` on ``phone_numbers.retrieve()`` instead."""
         return cast(
             PhoneRenewalResponse,
             self._request(

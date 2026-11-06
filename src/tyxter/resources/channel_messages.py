@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing_extensions import deprecated
+
 from tyxter.message_builders import (
+    _WHATSAPP_CHANNEL_DEPRECATION,
+    _whatsapp_channel_media,
+    _whatsapp_channel_text,
     instagram_media,
     instagram_text,
     whatsapp_audio_from_text,
-    whatsapp_channel_media,
-    whatsapp_channel_text,
     whatsapp_flow,
     whatsapp_interactive,
     whatsapp_media,
@@ -130,9 +133,17 @@ class InstagramMessagesResource:
 
 
 class WhatsAppChannelsResource:
+    """Deprecated: Tyxter does not support WhatsApp Channel publishing.
+
+    The API rejects both methods with ``invalid_message_request``. The class and the client's
+    ``whatsapp_channels`` attribute remain so existing imports and error handling keep working;
+    use ``whatsapp`` for supported one-to-one sends.
+    """
+
     def __init__(self, messages: MessagesResource) -> None:
         self._messages = messages
 
+    @deprecated(_WHATSAPP_CHANNEL_DEPRECATION)
     def publish_text(
         self,
         input: WhatsAppChannelTextMessageInput,
@@ -141,9 +152,10 @@ class WhatsAppChannelsResource:
         trace_id: str | None = None,
     ) -> MessageResponse:
         return self._messages.create(
-            whatsapp_channel_text(input), idempotency_key=idempotency_key, trace_id=trace_id
+            _whatsapp_channel_text(input), idempotency_key=idempotency_key, trace_id=trace_id
         )
 
+    @deprecated(_WHATSAPP_CHANNEL_DEPRECATION)
     def publish_media(
         self,
         input: WhatsAppChannelMediaMessageInput,
@@ -152,5 +164,5 @@ class WhatsAppChannelsResource:
         trace_id: str | None = None,
     ) -> MessageResponse:
         return self._messages.create(
-            whatsapp_channel_media(input), idempotency_key=idempotency_key, trace_id=trace_id
+            _whatsapp_channel_media(input), idempotency_key=idempotency_key, trace_id=trace_id
         )

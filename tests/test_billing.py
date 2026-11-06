@@ -4,6 +4,7 @@ import json
 from typing import cast
 
 import httpx
+import pytest
 
 from tyxter import Tyxter
 
@@ -171,10 +172,12 @@ def test_phone_renewals_use_exact_query_and_encoded_cycle_paths() -> None:
         transport=httpx.MockTransport(handler),
     )
 
-    listed = client.billing.list_phone_renewals(
-        limit=5, starting_after="phr_0", status="funding_required"
-    )
-    retrieved = client.billing.retrieve_phone_renewal("phr/1")
+    with pytest.warns(DeprecationWarning, match="Read `renewal` on phone_numbers"):
+        listed = client.billing.list_phone_renewals(
+            limit=5, starting_after="phr_0", status="funding_required"
+        )
+    with pytest.warns(DeprecationWarning, match="Read `renewal` on phone_numbers"):
+        retrieved = client.billing.retrieve_phone_renewal("phr/1")
 
     assert listed["data"][0]["recommended_action"] == "add_credit_or_enable_auto_topup"
     assert retrieved["actionable_state"] == "at_risk"

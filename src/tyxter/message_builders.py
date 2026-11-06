@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing_extensions import deprecated
+
 from tyxter.types import (
     CreateMessageRequest,
     InstagramMediaMessageInput,
@@ -144,7 +146,25 @@ def instagram_media(input: InstagramMediaMessageInput) -> CreateMessageRequest:
     )
 
 
+_WHATSAPP_CHANNEL_DEPRECATION = (
+    "WhatsApp Channel publishing is unsupported: the API rejects these legacy payloads with "
+    "invalid_message_request. Use the whatsapp builders for one-to-one sends."
+)
+
+
+@deprecated(_WHATSAPP_CHANNEL_DEPRECATION)
 def whatsapp_channel_text(input: WhatsAppChannelTextMessageInput) -> CreateMessageRequest:
+    """Deprecated legacy builder; the API rejects its payload with invalid_message_request."""
+    return _whatsapp_channel_text(input)
+
+
+@deprecated(_WHATSAPP_CHANNEL_DEPRECATION)
+def whatsapp_channel_media(input: WhatsAppChannelMediaMessageInput) -> CreateMessageRequest:
+    """Deprecated legacy builder; the API rejects its payload with invalid_message_request."""
+    return _whatsapp_channel_media(input)
+
+
+def _whatsapp_channel_text(input: WhatsAppChannelTextMessageInput) -> CreateMessageRequest:
     text: TextMessagePayload = {"body": input["body"]}
     if "preview_url" in input:
         text["preview_url"] = input["preview_url"]
@@ -159,7 +179,7 @@ def whatsapp_channel_text(input: WhatsAppChannelTextMessageInput) -> CreateMessa
     )
 
 
-def whatsapp_channel_media(input: WhatsAppChannelMediaMessageInput) -> CreateMessageRequest:
+def _whatsapp_channel_media(input: WhatsAppChannelMediaMessageInput) -> CreateMessageRequest:
     return _request(
         channel="whatsapp_channel",
         sender_type="whatsapp_channel",

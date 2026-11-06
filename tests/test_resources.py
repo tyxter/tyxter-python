@@ -1016,6 +1016,8 @@ def test_webhook_endpoint_test_is_an_empty_body_supported_idempotent_post() -> N
         (lambda client: client.billing.retrieve_phone_renewal(""), "cycle_id is required"),
     ],
 )
+# retrieve_phone_renewal is deprecated; its warning is asserted in test_billing.py.
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_resource_ids_are_required(call: Callable[[Tyxter], object], message: str) -> None:
     client, _ = make_client()
 
