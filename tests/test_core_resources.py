@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from collections.abc import Callable
 from typing import cast
 
@@ -8,6 +9,8 @@ import httpx
 import pytest
 
 from tyxter import Tyxter
+from tyxter.message_builders import whatsapp_channel_media, whatsapp_channel_text
+from tyxter.types import WhatsAppChannelMediaMessageInput, WhatsAppChannelTextMessageInput
 
 
 def make_client() -> tuple[Tyxter, list[httpx.Request]]:
@@ -43,8 +46,6 @@ def test_account_resource_uses_both_public_identity_routes() -> None:
     ]
 
 
-# Canonical deprecates WhatsApp Channel helpers for type checkers only; no runtime warning.
-@pytest.mark.filterwarnings("error::DeprecationWarning")
 def test_channel_resources_build_canonical_message_requests() -> None:
     client, seen = make_client()
 
@@ -345,3 +346,44 @@ def test_whatsapp_send_helpers_keep_the_quoted_message(
     assert sent["reply_to"] == _REPLY_TO
     assert sent["message"] == message
     assert sent["metadata"] == {"k": "v"}
+
+
+_CHANNEL_TEXT: WhatsAppChannelTextMessageInput = {"channel_id": "channel_123", "body": "hello"}
+_CHANNEL_MEDIA: WhatsAppChannelMediaMessageInput = {
+    "channel_id": "channel_123",
+    "media": {"kind": "image", "link": "https://x/y"},
+}
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        pytest.param(
+            lambda client: whatsapp_channel_text(_CHANNEL_TEXT), id="whatsapp_channel_text"
+        ),
+        pytest.param(
+            lambda client: whatsapp_channel_media(_CHANNEL_MEDIA), id="whatsapp_channel_media"
+        ),
+        pytest.param(
+            lambda client: client.whatsapp_channels.publish_text(_CHANNEL_TEXT), id="publish_text"
+        ),
+        pytest.param(
+            lambda client: client.whatsapp_channels.publish_media(_CHANNEL_MEDIA),
+            id="publish_media",
+        ),
+        pytest.param(lambda client: client.billing.list_phone_renewals(), id="list_phone_renewals"),
+        pytest.param(
+            lambda client: client.billing.retrieve_phone_renewal("phr_1"),
+            id="retrieve_phone_renewal",
+        ),
+    ],
+)
+def test_deprecated_calls_do_not_warn_at_runtime(call: Callable[[Tyxter], object]) -> None:
+    # Canonical deprecates these through JSDoc only; Python signals type checkers, not runtime.
+    client, _ = make_client()
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        call(client)
+
+    assert [str(warning.message) for warning in caught] == []

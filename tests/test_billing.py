@@ -4,7 +4,6 @@ import json
 from typing import cast
 
 import httpx
-import pytest
 
 from tyxter import Tyxter
 
@@ -129,8 +128,6 @@ def test_purchase_package_preserves_promotion_response_without_promotion_request
     assert body(seen[0]) == {"package_code": "pkg_10k", "payment_method": "card"}
 
 
-# Canonical deprecates these reads for type checkers only; they must not warn at runtime.
-@pytest.mark.filterwarnings("error::DeprecationWarning")
 def test_phone_renewals_use_exact_query_and_encoded_cycle_paths() -> None:
     seen: list[httpx.Request] = []
     renewal = {

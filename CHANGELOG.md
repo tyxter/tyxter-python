@@ -35,6 +35,8 @@ Python conventions and the deliberate differences from canonical:
   `PhoneNumberMutationResponse` keeps the inherited optional `renewal`, although mutation
   responses never carry it. A TypedDict subclass can neither make an inherited key required nor
   drop it, and a sibling type would break `PhoneNumberResponse` annotations on these methods.
+- `MessageReactionReceivedWebhookData` is not a structural subtype of `MessageWebhookData`, which
+  canonical extends: its sender requires `profile_name`, and TypedDict values are invariant.
 - `TyxterAPIError.next_allowed_at` is `None` both when the details omit it and when the API sent
   `null`, where canonical keeps `undefined` and `null` apart; `raw_body["details"]` tells the
   two apart.
@@ -145,9 +147,9 @@ Python conventions and the deliberate differences from canonical:
   `GroupMessageReceivedWebhookEnvelope`, `MessageReactionReceivedWebhookEnvelope`,
   `GroupWebhookEnvelope` (six lifecycle events), `GroupParticipantWebhookEnvelope` (with
   `GroupParticipantWebhookData`), `CreditHardBlockEngagedWebhookEnvelope` and
-  `CreditHardBlockLiftedWebhookEnvelope`, with their data types. The merchant `payment.*`
-  envelopes (`PaymentWebhookEnvelope` and its seven members), present in the canonical SDK since
-  before 0.8.0 but never ported, are added too.
+  `CreditHardBlockLiftedWebhookEnvelope`, with their data types. The merchant `payment.*` envelopes
+  (`PaymentWebhookEnvelope` and its seven members), present in the canonical SDK since
+  `sdk-js-v0.3.0` but never ported, are added too.
 - Typed `TyxterAPIError` views: `retryable` (the `False` stop hint), `raw_body`
   (`TyxterWireErrorBody`), `details` (the listen-session conflict), `guard_reason` and
   `next_allowed_at` (recipient-guard refusals), `rental_order` and `service_window`, with
@@ -203,11 +205,12 @@ Python conventions and the deliberate differences from canonical:
   `reply_to` key, so the message went out without its quote; they now send it.
 - The `messages.send_*` inputs accept every `MessageRecipient`, including a structured phone
   recipient, instead of only `MessageIdentity`.
-- Response fields canonical has had since before 0.4 and Python never typed:
+- Response fields canonical has had since `sdk-js-v0.4.0` and Python never typed:
   `estimated_external_meta_cost` on usage records, summaries and summary buckets
   (`EstimatedExternalMetaCost`, `EstimatedExternalMetaCostSummary`), and `templates` and
   `capabilities.send_template_messages` on `sandbox.quickstart()`. They are `NotRequired`.
-- `CreateAudienceRequest.contact_ids` is optional, as the API and canonical allow.
+- `CreateAudienceRequest.contact_ids` is optional, as the API allows and canonical has since
+  `sdk-js-v0.1.0`.
 - `MetaSignupSessionResponse` types the `"failed"` status and the optional `error`
   (`MetaSignupFailure`: `code` `meta_signup_session_expired`, `reason`, `message` and a `feedback`
   pointer) that `meta_signup_sessions.retrieve()` returns when a hosted signup handoff fails. Start a
