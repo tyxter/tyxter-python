@@ -172,10 +172,15 @@ user explicitly authorizes that release action and target. Never run a manual Py
 repository workflow uses Trusted Publishing and verifies main ancestry, version/channel agreement,
 the full Python matrix, package contents, and duplicate-release state.
 
-The workflow refuses to upload a version without a non-empty `## [<version>]` section in
-`CHANGELOG.md`. After the PyPI upload it creates the GitHub release `v<version>` from that
-section (a prerelease for alpha versions); a manual dispatch creates one only when tag `v<version>`
-already points at the published commit, and a rerun keeps an existing release.
+The workflow refuses to upload a version whose `## [<version>]` section in `CHANGELOG.md` is
+missing or has no entries, or when tag `v<version>` exists on a commit other than the one being
+published. After the PyPI upload it creates the GitHub release `v<version>` from that section,
+marked as a prerelease for a prerelease version (the alpha channel); if the release already exists,
+it leaves it unchanged. A manual dispatch without tag `v<version>` still publishes to PyPI but
+creates no release and ends with a warning. To retry a failed release step, use **Re-run failed
+jobs**, which repeats only the release. A full rerun, or the run that starts when you push the
+tag after such a dispatch, stops at the PyPI duplicate check by design. In that case, create the
+release by hand with the `gh release create` command printed in the warning.
 
 Preserve unrelated user changes. Do not discard edits, rewrite history, force-push, or use
 destructive Git commands. Do not commit, push, or open a PR unless requested or required by the
