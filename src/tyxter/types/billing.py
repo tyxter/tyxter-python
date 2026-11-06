@@ -244,6 +244,43 @@ class ListPhoneRenewalsResponse(TypedDict):
     next_cursor: str | None
 
 
+class PhoneManagementCoverageResponse(TypedDict):
+    state: Literal["plan", "prepaid", "none"]
+    covered_until: str | None
+    next_charge_at: str | None
+    next_charge_brl: str | None
+
+
+class PhoneManagementResponse(TypedDict):
+    phone_number_id: str
+    coverage: PhoneManagementCoverageResponse
+    covered_until: str | None
+    next_charge_at: str | None
+    next_charge_brl: str | None
+    # Charged `prepaid` coverage alone does not prove payment; read this field.
+    current_month_payment_status: NotRequired[Literal["paid", "unpaid", "not_charged"] | None]
+    disable_at: NotRequired[str | None]
+    service_state: NotRequired[
+        Literal["serving", "disabled_unpaid_month_end", "funding_required", "not_serving"] | None
+    ]
+
+
+class PhoneManagementSummary(TypedDict):
+    retained_count: int
+    monthly_total_brl: str
+    next_charge_at: str | None
+    # Exact total due at `next_charge_at`; None when no charge is scheduled.
+    next_charge_brl: NotRequired[str | None]
+
+
+class ListPhoneManagementResponse(TypedDict):
+    object: Literal["list"]
+    data: list[PhoneManagementResponse]
+    has_more: bool
+    next_cursor: str | None
+    summary: PhoneManagementSummary
+
+
 class InvoiceResponse(TypedDict):
     id: str
     object: Literal["invoice"]

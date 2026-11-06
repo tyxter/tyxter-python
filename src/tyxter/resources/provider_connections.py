@@ -7,14 +7,17 @@ from tyxter.types import (
     DeleteProviderConnectionResponse,
     ExchangeMetaOAuthCodeRequest,
     ListProviderConnectionsResponse,
+    ListSalvyNumbersResponse,
     MetaOnboardingConfigResponse,
     ProviderConnectionResponse,
     ProviderConnectionStatusResponse,
     ProviderCredentialSetupSessionResponse,
     ProviderCredentialSetupSessionResult,
+    RegisterSalvyConnectionRequest,
+    RotateSalvyConnectionRequest,
 )
 
-from ._base import Resource, path_id
+from ._base import Resource, path_id, required_idempotency_key
 
 
 class ProviderCredentialSetupSessionsResource(Resource):
@@ -121,6 +124,72 @@ class ProviderConnectionsResource(Resource):
             self._request(
                 "GET",
                 f"/v1/provider-connections/{path_id('connection_id', connection_id)}",
+            ),
+        )
+
+    def register_salvy(
+        self,
+        payload: RegisterSalvyConnectionRequest,
+        *,
+        idempotency_key: str,
+    ) -> ProviderConnectionResponse:
+        return cast(
+            ProviderConnectionResponse,
+            self._request(
+                "POST",
+                "/v1/provider-connections/salvy",
+                json=payload,
+                idempotency_key=required_idempotency_key(idempotency_key),
+            ),
+        )
+
+    def rotate_salvy(
+        self,
+        connection_id: str,
+        payload: RotateSalvyConnectionRequest,
+        *,
+        idempotency_key: str,
+    ) -> ProviderConnectionResponse:
+        return cast(
+            ProviderConnectionResponse,
+            self._request(
+                "POST",
+                f"/v1/provider-connections/{path_id('connection_id', connection_id)}/salvy/rotate",
+                json=payload,
+                idempotency_key=required_idempotency_key(idempotency_key),
+            ),
+        )
+
+    def refresh_salvy_discovery(
+        self,
+        connection_id: str,
+        *,
+        idempotency_key: str,
+    ) -> ProviderConnectionResponse:
+        return cast(
+            ProviderConnectionResponse,
+            self._request(
+                "POST",
+                f"/v1/provider-connections/{path_id('connection_id', connection_id)}"
+                "/salvy/discovery",
+                json={},
+                idempotency_key=required_idempotency_key(idempotency_key),
+            ),
+        )
+
+    def list_salvy_numbers(
+        self,
+        connection_id: str,
+        *,
+        limit: int | None = None,
+        starting_after: str | None = None,
+    ) -> ListSalvyNumbersResponse:
+        return cast(
+            ListSalvyNumbersResponse,
+            self._request(
+                "GET",
+                f"/v1/provider-connections/{path_id('connection_id', connection_id)}/salvy/numbers",
+                params={"limit": limit, "starting_after": starting_after},
             ),
         )
 

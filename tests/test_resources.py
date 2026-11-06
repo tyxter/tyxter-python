@@ -404,6 +404,36 @@ CALLER_REQUIRED_KEY_CALLS: dict[str, Callable[[Tyxter, str], object]] = {
     "meta_signup_sessions.create": lambda client, key: client.meta_signup_sessions.create(
         {"return_url": "https://merchant.example/meta/callback"}, idempotency_key=key
     ),
+    "provider_connections.register_salvy": lambda client, key: (
+        client.provider_connections.register_salvy(
+            {"api_key": "salvy_test_key", "continuation_terms_version": "salvy_byok_v1"},
+            idempotency_key=key,
+        )
+    ),
+    "provider_connections.rotate_salvy": lambda client, key: (
+        client.provider_connections.rotate_salvy(
+            "pc_123", {"api_key": "salvy_test_key"}, idempotency_key=key
+        )
+    ),
+    "provider_connections.refresh_salvy_discovery": lambda client, key: (
+        client.provider_connections.refresh_salvy_discovery("pc_123", idempotency_key=key)
+    ),
+    "phone_numbers.import_salvy": lambda client, key: client.phone_numbers.import_salvy(
+        {
+            "provider_connection_id": "pc_123",
+            "provider_number_id": "salvy_num_1",
+            "continuation_terms_version": "salvy_byok_v1",
+        },
+        idempotency_key=key,
+    ),
+    "phone_numbers.complete_salvy_registration": lambda client, key: (
+        client.phone_numbers.complete_salvy_registration(
+            "pn_123", {"meta_phone_number_id": "meta_1"}, idempotency_key=key
+        )
+    ),
+    "phone_numbers.convert_to_byon": lambda client, key: client.phone_numbers.convert_to_byon(
+        "pn_123", idempotency_key=key
+    ),
 }
 
 
@@ -421,6 +451,149 @@ def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
         call(client, idempotency_key)
 
     assert seen == []
+
+
+@pytest.mark.parametrize(
+    ("call", "method", "url", "body"),
+    [
+        pytest.param(
+            lambda client: client.groups.retrieve("https://chat.whatsapp.com/AbC"),
+            "GET",
+            "https://api.test/v1/groups/https%3A%2F%2Fchat.whatsapp.com%2FAbC",
+            None,
+            id="groups.retrieve",
+        ),
+        pytest.param(
+            lambda client: client.groups.delete("grp/1", idempotency_key="idem_delete"),
+            "DELETE",
+            "https://api.test/v1/groups/grp%2F1",
+            None,
+            id="groups.delete",
+        ),
+        pytest.param(
+            lambda client: client.groups.reset_invite_link("grp/1"),
+            "POST",
+            "https://api.test/v1/groups/grp%2F1/invite-link/reset",
+            None,
+            id="groups.reset_invite_link",
+        ),
+        pytest.param(
+            lambda client: client.groups.retrieve_eligibility(phone_number_id="pn_1"),
+            "GET",
+            "https://api.test/v1/groups/eligibility?phone_number_id=pn_1",
+            None,
+            id="groups.retrieve_eligibility",
+        ),
+        pytest.param(
+            lambda client: client.groups.list(limit=5, phone_number_id="pn_1", status="active"),
+            "GET",
+            "https://api.test/v1/groups?limit=5&phone_number_id=pn_1&status=active",
+            None,
+            id="groups.list",
+        ),
+        pytest.param(
+            lambda client: client.sandbox.groups.simulate_participant(
+                "grp/1", {"wa_id": "5511999990000", "action": "join"}
+            ),
+            "POST",
+            "https://api.test/v1/sandbox/groups/grp%2F1/participants",
+            {"wa_id": "5511999990000", "action": "join"},
+            id="sandbox.groups.simulate_participant",
+        ),
+        pytest.param(
+            lambda client: client.phone_numbers.get_meta_diagnostics("pn/1"),
+            "GET",
+            "https://api.test/v1/phone-numbers/pn%2F1/meta-diagnostics",
+            None,
+            id="phone_numbers.get_meta_diagnostics",
+        ),
+        pytest.param(
+            lambda client: client.phone_numbers.request_meta_diagnostics("pn/1"),
+            "POST",
+            "https://api.test/v1/phone-numbers/pn%2F1/meta-diagnostics",
+            {},
+            id="phone_numbers.request_meta_diagnostics",
+        ),
+        pytest.param(
+            lambda client: client.phone_numbers.request_meta_diagnostics(
+                "pn_1", {"sandbox_scenario": "token_invalid"}
+            ),
+            "POST",
+            "https://api.test/v1/phone-numbers/pn_1/meta-diagnostics",
+            {"sandbox_scenario": "token_invalid"},
+            id="phone_numbers.request_meta_diagnostics.scenario",
+        ),
+        pytest.param(
+            lambda client: client.phone_numbers.retrieve_order("ord/1"),
+            "GET",
+            "https://api.test/v1/phone-numbers/orders/ord%2F1",
+            None,
+            id="phone_numbers.retrieve_order",
+        ),
+        pytest.param(
+            lambda client: client.phone_numbers.complete_salvy_registration(
+                "pn/1", {"meta_phone_number_id": "meta_1"}, idempotency_key="idem_complete"
+            ),
+            "POST",
+            "https://api.test/v1/phone-numbers/pn%2F1/salvy/complete-registration",
+            {"meta_phone_number_id": "meta_1"},
+            id="phone_numbers.complete_salvy_registration",
+        ),
+        pytest.param(
+            lambda client: client.phone_numbers.convert_to_byon("pn/1", idempotency_key="idem"),
+            "POST",
+            "https://api.test/v1/phone-numbers/pn%2F1/convert-to-byon",
+            {},
+            id="phone_numbers.convert_to_byon",
+        ),
+        pytest.param(
+            lambda client: client.provider_connections.rotate_salvy(
+                "pc/1", {"api_key": "salvy_test_key"}, idempotency_key="idem_rotate"
+            ),
+            "POST",
+            "https://api.test/v1/provider-connections/pc%2F1/salvy/rotate",
+            {"api_key": "salvy_test_key"},
+            id="provider_connections.rotate_salvy",
+        ),
+        pytest.param(
+            lambda client: client.provider_connections.refresh_salvy_discovery(
+                "pc/1", idempotency_key="idem_refresh"
+            ),
+            "POST",
+            "https://api.test/v1/provider-connections/pc%2F1/salvy/discovery",
+            {},
+            id="provider_connections.refresh_salvy_discovery",
+        ),
+        pytest.param(
+            lambda client: client.provider_connections.list_salvy_numbers("pc/1", limit=5),
+            "GET",
+            "https://api.test/v1/provider-connections/pc%2F1/salvy/numbers?limit=5",
+            None,
+            id="provider_connections.list_salvy_numbers",
+        ),
+        pytest.param(
+            lambda client: client.payments.cancel("pay/1", idempotency_key="idem_cancel"),
+            "POST",
+            "https://api.test/v1/payments/pay%2F1/cancel",
+            {},
+            id="payments.cancel",
+        ),
+    ],
+)
+def test_groups_orders_diagnostics_salvy_and_cancel_encode_ids_and_send_contract_bodies(
+    call: Callable[[Tyxter], object],
+    method: str,
+    url: str,
+    body: dict[str, Any] | None,
+) -> None:
+    client, seen = make_client()
+
+    call(client)
+
+    assert len(seen) == 1
+    assert_request(seen[0], method=method, url=url, body=body)
+    if body is None:
+        assert not seen[0].content
 
 
 def test_messages_retry_transcription_preserves_retry_after_api_errors() -> None:

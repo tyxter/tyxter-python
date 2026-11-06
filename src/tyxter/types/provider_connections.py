@@ -6,19 +6,20 @@ from typing_extensions import NotRequired, Required, TypedDict
 
 from .common import Environment
 
-ProviderName: TypeAlias = Literal["meta", "iniciador", "abacate_pay"]
+ProviderName: TypeAlias = Literal["meta", "iniciador", "abacate_pay", "salvy"]
 ProviderConnectionStatus: TypeAlias = Literal["pending", "connected", "suspended", "disconnected"]
 ProviderConnectionSendCapability: TypeAlias = Literal["available", "blocked"]
 ProviderConnectionSendBlockCode: TypeAlias = Literal[141006, 141008, 141011]
 ProviderTokenSource: TypeAlias = Literal["manual", "embedded_signup"]
 ProviderConnectionChannel: TypeAlias = Literal[
-    "whatsapp", "instagram", "payments", "agentic_payments"
+    "whatsapp", "instagram", "payments", "agentic_payments", "phone_numbers"
 ]
 ProviderReadinessStatus: TypeAlias = Literal[
     "missing", "connected", "pending", "suspended", "disconnected", "selection_required"
 ]
 ProviderCredentialSetupTarget: TypeAlias = Literal[
     "meta.whatsapp",
+    "salvy",
     "abacate_pay.payments",
     "iniciador.payments",
     "iniciador.agentic_payments",
@@ -68,6 +69,49 @@ class ExchangeMetaOAuthCodeRequest(TypedDict, total=False):
     signup_session_id: NotRequired[str]
 
 
+SalvyConnectionOperationErrorCode: TypeAlias = Literal[
+    "salvy_credentials_invalid",
+    "salvy_provider_unavailable",
+    "salvy_connection_unavailable",
+]
+
+
+class SalvyConnectionOperation(TypedDict):
+    state: Literal["queued", "succeeded", "failed"]
+    error_code: SalvyConnectionOperationErrorCode | None
+
+
+class SalvyConnectionInfo(TypedDict):
+    sync_mode: Literal["polling"]
+    credential_hint: str | None
+    discovered_at: str | None
+    operation: SalvyConnectionOperation | None
+
+
+class RegisterSalvyConnectionRequest(TypedDict):
+    api_key: str
+    display_name: NotRequired[str]
+    continuation_terms_version: Literal["salvy_byok_v1"]
+
+
+class RotateSalvyConnectionRequest(TypedDict):
+    api_key: str
+
+
+class SalvyNumberResponse(TypedDict):
+    provider_number_id: str
+    phone: str
+    provider_status: str
+    imported_phone_number_id: str | None
+
+
+class ListSalvyNumbersResponse(TypedDict):
+    object: Literal["list"]
+    data: list[SalvyNumberResponse]
+    has_more: bool
+    next_cursor: str | None
+
+
 class ProviderConnectionRestriction(TypedDict):
     restriction_type: str
     expiration: str | None
@@ -95,6 +139,8 @@ class ProviderConnectionResponse(TypedDict):
     ig_business_account_id: str | None
     page_id: str | None
     provider_account_id: str | None
+    # Customer-owned Salvy discovery state; None for every non-Salvy connection.
+    salvy: NotRequired[SalvyConnectionInfo | None]
     payment_receiver: PaymentReceiverProfile | None
     payment_capabilities: PaymentProviderCapabilities | None
     agentic_capabilities: AgenticPaymentProviderCapabilities | None
@@ -243,6 +289,7 @@ class ProviderCredentialSetupSessionCompletedConnectionResult(
 ):
     target: Literal[
         "meta.whatsapp",
+        "salvy",
         "abacate_pay.payments",
         "iniciador.payments",
         "iniciador.agentic_payments",
