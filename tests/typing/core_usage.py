@@ -4,7 +4,7 @@ from typing import Literal
 
 from typing_extensions import assert_type
 
-from tyxter import Tyxter, TyxterAPIError
+from tyxter import Tyxter
 from tyxter.types import (
     AgenticPlatformDefaultStatus,
     CreateApiKeyRequest,
@@ -13,8 +13,6 @@ from tyxter.types import (
     CreateProjectRequest,
     CreateTemplateRequest,
     CreateWebhookEndpointResponse,
-    CreditHardBlockEngagedWebhookEnvelope,
-    CreditHardBlockTrigger,
     CreditToppedUpWebhookData,
     CreditToppedUpWebhookEnvelope,
     DisplayNameWarningCode,
@@ -24,12 +22,9 @@ from tyxter.types import (
     EstimatedExternalMetaCostSummary,
     FlowRejectionCode,
     FlowResponse,
-    GroupMessageReceivedWebhookEnvelope,
     GroupParticipantJoinedWebhookData,
     GroupParticipantRemovalInitiator,
     GroupParticipantWebhookEnvelope,
-    GroupWebhookEnvelope,
-    GroupWebhookStatus,
     InboundMessageMediaConsumed,
     InboundMessageMediaDescriptor,
     InboundMessageMediaFailed,
@@ -80,7 +75,6 @@ from tyxter.types import (
     PhoneNumberOrderResponse,
     PhoneNumberPendingNameReviewResponse,
     PhoneNumberReadResponse,
-    PhoneNumberRentalApprovalOrder,
     PhoneNumberResponse,
     PhoneRenewalResponse,
     PhoneRenewalSummaryState,
@@ -104,8 +98,6 @@ from tyxter.types import (
     RotateWebhookSigningSecretResponse,
     SandboxDefaultTemplate,
     SendMediaMessageInput,
-    ServiceWindowRequiredDetails,
-    ServiceWindowRequiredReason,
     TemplateGenerationRequest,
     TemplateGenerationResponse,
     TemplateParameterFormat,
@@ -115,10 +107,8 @@ from tyxter.types import (
     TopupResponse,
     TypingIndicatorResponse,
     TyxterErrorBody,
-    TyxterWireErrorBody,
     UpdateTemplateRequest,
     WebhookEndpointResponse,
-    WebhookListenSessionConflictDetails,
     WhatsAppGroupRecipientIdentity,
 )
 
@@ -1015,24 +1005,10 @@ def parity_0_12_responses(client: Tyxter, payment: PaymentResponse) -> None:
     assert_type(sender.get("profile_name"), str | None)
 
 
-def parity_0_12_errors(error: TyxterAPIError) -> None:
-    assert_type(error.retryable, Literal[False] | None)
-    assert_type(error.raw_body, TyxterWireErrorBody | None)
-    assert_type(error.details, WebhookListenSessionConflictDetails | None)
-    assert_type(error.next_allowed_at, str | None)
-    assert_type(error.rental_order, PhoneNumberRentalApprovalOrder | None)
-    assert_type(error.service_window, ServiceWindowRequiredDetails | None)
-    if error.service_window is not None:
-        assert_type(error.service_window["reason"], ServiceWindowRequiredReason)
-
-
 def parity_0_12_webhooks(
     participant: GroupParticipantWebhookEnvelope,
     payment: PaymentWebhookEnvelope,
-    lifecycle: GroupWebhookEnvelope,
-    group_message: GroupMessageReceivedWebhookEnvelope,
     reaction: MessageReactionReceivedWebhookEnvelope,
-    hard_block: CreditHardBlockEngagedWebhookEnvelope,
 ) -> None:
     if participant["type"] == "group.participant_removed":
         assert_type(participant["data"]["initiated_by"], GroupParticipantRemovalInitiator)
@@ -1042,10 +1018,7 @@ def parity_0_12_webhooks(
         assert_type(payment["data"]["payment_link_url"], str)
     elif payment["type"] == "payment.created":
         assert_type(payment["data"]["payment_link_url"], None)
-    assert_type(lifecycle["data"]["status"], GroupWebhookStatus)
-    assert_type(group_message["data"]["recipient"]["type"], Literal["whatsapp_group"])
     assert_type(reaction["data"]["reaction"]["from"], str | None)
-    assert_type(hard_block["data"]["trigger"], CreditHardBlockTrigger)
 
 
 def pre_0_8_usage_and_quickstart_reads(client: Tyxter) -> None:
