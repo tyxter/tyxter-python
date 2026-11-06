@@ -37,9 +37,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://docs.tyxter.com"
-Repository = "https://github.com/tyxter-dev/tyxter-python"
-Changelog = "https://github.com/tyxter-dev/tyxter-python/blob/main/CHANGELOG.md"
+Homepage = "https://tyxter.com/docs"
+Repository = "https://github.com/tyxter/tyxter-python"
+Changelog = "https://github.com/tyxter/tyxter-python/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tyxter"]

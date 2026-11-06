@@ -19,7 +19,7 @@ Install the published SDK with `pip install tyxter`, or pin this release with
 install a checkout; doing so does not publish it:
 
 ```bash
-git clone https://github.com/tyxter-dev/tyxter-python.git
+git clone https://github.com/tyxter/tyxter-python.git
 cd tyxter-python
 git checkout main
 uv sync --locked --extra dev
@@ -208,7 +208,7 @@ The client exposes snake-case resource namespaces:
 - `account`, `api_keys`, `ai_agents`, `agentic_payments`, `audiences`, and `projects`
 - `automations`, `automation_runs`, and `automation_webhooks`
 - `batches`, `billing`, `contacts`, `data_retention`, `feedback`, `fiscal`,
-  and `flows`
+  `flows`, and `groups`
 - `llm`, `llm_routes`, `media`, `messages`, `meta_signup_sessions`, and `payments`
 - `phone_numbers`, `provider_connections`, and
   `provider_credential_setup_sessions`
@@ -348,6 +348,33 @@ observed timestamp. Policy-warning strings remain open provider values. A flow's
 checked, while a timestamp is the first reconciliation failure. Verify provider warning and
 scheduled-disable webhook envelopes with the existing raw-body signature verifier.
 
+## Asynchronous phone, diagnostics, and group operations
+
+The API accepts these writes and a Tyxter worker completes them; the request
+itself calls no provider. Read the resource again for the outcome.
+
+- `phone_numbers.request_meta_diagnostics()` returns the stored answer with
+  `check_accepted`; poll `get_meta_diagnostics()` until `check_pending` is false.
+  A capability `value` is `True`, `False`, or `"unknown"`: `"unknown"` means
+  required facts are missing, not that the capability is refused. A section
+  whose `status` is `read_failed` carries a `failure` and no facts.
+- `phone_numbers.create_order()` creates a rental order. In production it waits
+  at `approval_url` for an organization owner or admin; no API key can approve
+  it, and nothing is charged before approval. Poll `retrieve_order()`.
+- Salvy BYOK: `provider_connections.register_salvy()` returns a pending
+  connection whose `salvy.operation` reports the worker's validation;
+  `list_salvy_numbers()` reads the cached discovery snapshot, and
+  `phone_numbers.import_salvy()` imports one number from it.
+  `billing.list_phone_management()` reports management coverage and charges.
+- `groups` (beta) manages WhatsApp Business groups created through Meta's Groups
+  API, never personal WhatsApp groups. `groups.create()` returns a `pending`
+  group, which stays `pending` until Meta's create outcome arrives. In sandbox,
+  `sandbox.groups.simulate_participant()` simulates members joining and leaving.
+- `payments.cancel()` queues hosted-checkout cancellation and returns the current
+  payment; poll `retrieve()` until the provider confirms a terminal status.
+  Transparent Pix and unsupported providers answer
+  `payment_cancellation_unsupported` and change nothing.
+
 ## Promotional credit reads and events
 
 Top-up responses and `credit.topped_up` webhook events can report both `payment_method` and
@@ -383,8 +410,12 @@ fields:
 - **Supported** endpoints accept an optional caller key and forward it when one
   is supplied.
 - **Required** endpoints always send a key. `feedback.create()` generates one
-  when omitted (and rejects an explicit blank key); transcription retry requires
-  the caller to supply a nonblank key.
+  when omitted (and rejects an explicit blank key). Every other required
+  endpoint takes a caller-supplied, nonblank key and rejects a blank one before
+  any request: transcription retry, `meta_signup_sessions.create()`, the Salvy
+  provider-connection writes (`register_salvy`, `rotate_salvy`,
+  `refresh_salvy_discovery`), and `phone_numbers.import_salvy()`,
+  `complete_salvy_registration()` and `convert_to_byon()`.
 
 Flow creation, LLM route upsert/delete, AI Agent completion, and automation
 webhook-secret rotation all accept the `idempotency_key` keyword argument.
@@ -502,16 +533,16 @@ that hits a route the manifest does not define fails, and a query parameter or
 `Idempotency-Key` mode (`unsupported`, `supported`, or `required`) that drifts
 from the contract fails.
 
-The current manifest at `ed49c514b74a59de3b238d4ebc157f20482b6171` classifies
-all **181** rows: **179** have typed SDK routes, while `PUT` and
-`GET /v1/media/blobs/:token` are the two reviewed capability-token exemptions.
-Those operations use the signed capability token as their sole authority; they
-are not bearer-authenticated SDK routes. This current-manifest count includes
-the two post-tag phone-renewal reads. They ship in Python 0.8.0 as explicitly
-identified forward-compatible additions and are not attributed to the published
-`sdk-js-v0.8.0` tag, whose scope is separately pinned at
-`58524926a1fa9498bcfe3abb9d7aa8fd39be1e85`. The count is source-conformance
-evidence, not a publication claim.
+The current manifest at `e253e046739889d2bd2d32c4798e3864ba9f9290` classifies
+all **206** rows: **198** have typed SDK routes, and **8** are reviewed
+exemptions. `PUT` and `GET /v1/media/blobs/:token` are capability-token routes:
+the signed token is their sole authority, so they are not bearer-authenticated
+SDK routes. The other six are `GET` and `DELETE` under
+`/v1/groups/{https://chat.whatsapp.com,http://chat.whatsapp.com,chat.whatsapp.com}/*`,
+teaching-only refusals for a pasted personal WhatsApp invite link that the
+manifest itself declares have no SDK method; `groups.retrieve()` and
+`groups.delete()` percent-encode the id and reach the same `422`. The count is
+source-conformance evidence, not a publication claim.
 
 **Do not hand-edit these files to make a test pass.** They are generated in the
 Tyxter Messaging repo, where they are verified against the mounted `v1`
