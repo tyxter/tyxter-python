@@ -161,11 +161,23 @@ from .contacts import (
 )
 from .data_retention import DataRetentionPolicyResponse, UpdateDataRetentionPolicyRequest
 from .errors import (
+    CreditBalanceExhaustedDetails,
+    CreditBalanceExhaustedReachableRoute,
     ErrorDiscoveryPointer,
     ErrorFeedbackPointer,
+    PhoneNumberRentalApprovalOrder,
+    PhoneNumberRentalApprovalRequiredDetails,
+    RecipientGuardDetails,
+    ServiceWindowRequiredDetails,
+    ServiceWindowRequiredReason,
     TyxterErrorBody,
     TyxterErrorResponse,
     TyxterErrorType,
+    TyxterWireErrorBody,
+    TyxterWireErrorDetails,
+    TyxterWireErrorResponse,
+    WebhookListenSessionActiveSession,
+    WebhookListenSessionConflictDetails,
 )
 from .feedback import (
     CreateFeedbackRequest,
@@ -1025,4 +1037,16 @@ __all__ = [
     "WhatsAppTextMessageInput",
     "WhatsAppTTSMessageInput",
     "ListenWebhookEventsResponse",
+    "CreditBalanceExhaustedDetails",
+    "CreditBalanceExhaustedReachableRoute",
+    "PhoneNumberRentalApprovalOrder",
+    "PhoneNumberRentalApprovalRequiredDetails",
+    "RecipientGuardDetails",
+    "ServiceWindowRequiredDetails",
+    "ServiceWindowRequiredReason",
+    "TyxterWireErrorBody",
+    "TyxterWireErrorDetails",
+    "TyxterWireErrorResponse",
+    "WebhookListenSessionActiveSession",
+    "WebhookListenSessionConflictDetails",
 ]
