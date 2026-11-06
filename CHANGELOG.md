@@ -67,6 +67,8 @@ are byte-identical to the vendored copies. These entries do not claim parity wit
 
 ### Fixed
 
+- `MetaOnboardingConfigResponse` types `login_options.extras.version` as `"v4"`, the Embedded
+  Signup version the API returns; it was `"v3"`.
 - Package metadata: the Homepage URL pointed at `docs.tyxter.com`, which does not resolve; it now
   points at `https://tyxter.com/docs`. The Repository and Changelog URLs point at
   `tyxter/tyxter-python`.

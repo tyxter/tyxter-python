@@ -211,7 +211,7 @@ class ProviderConnectionStatusResponse(TypedDict):
 
 
 class MetaOnboardingExtras(TypedDict):
-    version: Literal["v3"]
+    version: Literal["v4"]
     sessionInfoVersion: Literal["3"]
 
 
