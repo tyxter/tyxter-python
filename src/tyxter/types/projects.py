@@ -28,7 +28,9 @@ ProjectProfileVertical: TypeAlias = Literal[
     "TRAVEL",
     "RESTAURANT",
 ]
-ProjectProfileMetaSyncStatus: TypeAlias = Literal["not_synced", "synced", "failed"]
+# `syncing`: a requested sync is queued or running in a Tyxter worker; the other fields keep
+# the last result.
+ProjectProfileMetaSyncStatus: TypeAlias = Literal["not_synced", "syncing", "synced", "failed"]
 
 
 class EnvironmentResponse(TypedDict):

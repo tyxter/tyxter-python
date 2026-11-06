@@ -4,7 +4,9 @@ from typing import Literal, TypeAlias
 
 from typing_extensions import NotRequired, TypedDict
 
+from .billing import PhoneRenewalSummary
 from .common import Environment
+from .display_names import DisplayNameWarning
 
 PhoneNumberSource: TypeAlias = Literal["salvy", "byon"]
 PhoneNumberStatus: TypeAlias = Literal[
@@ -208,6 +210,11 @@ class PhoneNumberResponse(TypedDict):
     # this marker untouched.
     meta_health_synced_at: str | None
     current_24h_unique_recipients: int
+    # Estimated new recipients left before Tyxter holds sends, over a rolling 24-hour window,
+    # against a cap reduced by the configured safety margin and the sending phone's quality
+    # ratio, so it can reach zero before the raw allowance is spent. Linked phones share
+    # portfolio usage but can report different values when their quality differs. None means
+    # Tyxter cannot estimate it at all, never zero.
     remaining_messaging_allowance_estimate: int | None
     verification_code: str | None
     verification_code_received_at: str | None
@@ -218,12 +225,35 @@ class PhoneNumberResponse(TypedDict):
     updated_at: str
     activated_at: str | None
     released_at: str | None
+    # The number's current rental month. Reads always carry it (see PhoneNumberReadResponse);
+    # mutation responses, including old idempotency replays, keep their original shape.
+    renewal: NotRequired[PhoneRenewalSummary | None]
     recent_messages: list[PhoneNumberRecentMessageResponse]
+
+
+class PhoneNumberReadResponse(PhoneNumberResponse):
+    """A phone number as `phone_numbers.list()` and `phone_numbers.retrieve()` return it.
+
+    The API always includes `renewal` on these reads; it is None only when rental policy does
+    not apply (BYON and sandbox numbers). A TypedDict subclass cannot make the inherited key
+    required without breaking existing `PhoneNumberResponse` annotations, so the type keeps it
+    optional.
+    """
+
+
+class PhoneNumberMutationResponse(PhoneNumberResponse):
+    """A phone number returned by `provision()` or `connect()`.
+
+    `warnings` carries advisory display-name suggestions; it may be absent on older cached
+    idempotency responses.
+    """
+
+    warnings: NotRequired[list[DisplayNameWarning]]
 
 
 class ListPhoneNumbersResponse(TypedDict):
     object: Literal["list"]
-    data: list[PhoneNumberResponse]
+    data: list[PhoneNumberReadResponse]
     has_more: bool
     next_cursor: str | None
 

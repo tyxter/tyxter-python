@@ -5,6 +5,7 @@ from typing import Literal, TypeAlias
 from typing_extensions import NotRequired, TypedDict
 
 from .common import Environment, JSONObject
+from .payments import PaymentFees
 
 AgenticPixMethod: TypeAlias = Literal["PIX_DICT", "PIX_MANU", "PIX_QRCODE"]
 AgenticAuthorizationStatus: TypeAlias = Literal["pending", "completed", "revoked", "rejected"]
@@ -156,6 +157,10 @@ class AgenticPaymentResponse(TypedDict):
     rejected_at: str | None
     expired_at: str | None
     error_at: str | None
+    # None: no fee is owed. An Idempotency-Key replay (creation or cancel) returns its stored
+    # response, with `fees` as at the original call; read the payment for the current state.
+    # Absent only on such a replay stored before the field existed.
+    fees: NotRequired[PaymentFees | None]
 
 
 class ListAgenticAuthorizationsResponse(TypedDict):
