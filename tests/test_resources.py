@@ -454,12 +454,13 @@ def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
 
 
 @pytest.mark.parametrize(
-    ("call", "method", "url", "body"),
+    ("call", "method", "url", "body", "idempotency_key"),
     [
         pytest.param(
             lambda client: client.groups.retrieve("https://chat.whatsapp.com/AbC"),
             "GET",
             "https://api.test/v1/groups/https%3A%2F%2Fchat.whatsapp.com%2FAbC",
+            None,
             None,
             id="groups.retrieve",
         ),
@@ -468,19 +469,43 @@ def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
             "DELETE",
             "https://api.test/v1/groups/grp%2F1",
             None,
+            "idem_delete",
             id="groups.delete",
         ),
         pytest.param(
-            lambda client: client.groups.reset_invite_link("grp/1"),
+            lambda client: client.groups.reset_invite_link("grp/1", idempotency_key="idem_reset"),
             "POST",
             "https://api.test/v1/groups/grp%2F1/invite-link/reset",
             None,
+            "idem_reset",
             id="groups.reset_invite_link",
+        ),
+        pytest.param(
+            lambda client: client.groups.create(
+                {"phone_number_id": "pn_1", "subject": "Support", "description": None},
+                idempotency_key="idem_group",
+            ),
+            "POST",
+            "https://api.test/v1/groups",
+            {"phone_number_id": "pn_1", "subject": "Support", "description": None},
+            "idem_group",
+            id="groups.create",
+        ),
+        pytest.param(
+            lambda client: client.groups.create_eligibility_check(
+                {"phone_number_id": "pn_1"}, idempotency_key="idem_check"
+            ),
+            "POST",
+            "https://api.test/v1/groups/eligibility-checks",
+            {"phone_number_id": "pn_1"},
+            "idem_check",
+            id="groups.create_eligibility_check",
         ),
         pytest.param(
             lambda client: client.groups.retrieve_eligibility(phone_number_id="pn_1"),
             "GET",
             "https://api.test/v1/groups/eligibility?phone_number_id=pn_1",
+            None,
             None,
             id="groups.retrieve_eligibility",
         ),
@@ -489,21 +514,26 @@ def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
             "GET",
             "https://api.test/v1/groups?limit=5&phone_number_id=pn_1&status=active",
             None,
+            None,
             id="groups.list",
         ),
         pytest.param(
             lambda client: client.sandbox.groups.simulate_participant(
-                "grp/1", {"wa_id": "5511999990000", "action": "join"}
+                "grp/1",
+                {"wa_id": "5511999990000", "action": "join"},
+                idempotency_key="idem_participant",
             ),
             "POST",
             "https://api.test/v1/sandbox/groups/grp%2F1/participants",
             {"wa_id": "5511999990000", "action": "join"},
+            "idem_participant",
             id="sandbox.groups.simulate_participant",
         ),
         pytest.param(
             lambda client: client.phone_numbers.get_meta_diagnostics("pn/1"),
             "GET",
             "https://api.test/v1/phone-numbers/pn%2F1/meta-diagnostics",
+            None,
             None,
             id="phone_numbers.get_meta_diagnostics",
         ),
@@ -512,23 +542,55 @@ def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
             "POST",
             "https://api.test/v1/phone-numbers/pn%2F1/meta-diagnostics",
             {},
+            None,
             id="phone_numbers.request_meta_diagnostics",
         ),
         pytest.param(
             lambda client: client.phone_numbers.request_meta_diagnostics(
-                "pn_1", {"sandbox_scenario": "token_invalid"}
+                "pn_1", {"sandbox_scenario": "token_invalid"}, idempotency_key="idem_diag"
             ),
             "POST",
             "https://api.test/v1/phone-numbers/pn_1/meta-diagnostics",
             {"sandbox_scenario": "token_invalid"},
+            "idem_diag",
             id="phone_numbers.request_meta_diagnostics.scenario",
+        ),
+        pytest.param(
+            lambda client: client.phone_numbers.create_order(
+                {"ddd": "11", "purpose": "Support line"}, idempotency_key="idem_order"
+            ),
+            "POST",
+            "https://api.test/v1/phone-numbers/orders",
+            {"ddd": "11", "purpose": "Support line"},
+            "idem_order",
+            id="phone_numbers.create_order",
         ),
         pytest.param(
             lambda client: client.phone_numbers.retrieve_order("ord/1"),
             "GET",
             "https://api.test/v1/phone-numbers/orders/ord%2F1",
             None,
+            None,
             id="phone_numbers.retrieve_order",
+        ),
+        pytest.param(
+            lambda client: client.phone_numbers.import_salvy(
+                {
+                    "provider_connection_id": "pc_1",
+                    "provider_number_id": "salvy_num_1",
+                    "continuation_terms_version": "salvy_byok_v1",
+                },
+                idempotency_key="idem_import",
+            ),
+            "POST",
+            "https://api.test/v1/phone-numbers/import-salvy",
+            {
+                "provider_connection_id": "pc_1",
+                "provider_number_id": "salvy_num_1",
+                "continuation_terms_version": "salvy_byok_v1",
+            },
+            "idem_import",
+            id="phone_numbers.import_salvy",
         ),
         pytest.param(
             lambda client: client.phone_numbers.complete_salvy_registration(
@@ -537,14 +599,30 @@ def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
             "POST",
             "https://api.test/v1/phone-numbers/pn%2F1/salvy/complete-registration",
             {"meta_phone_number_id": "meta_1"},
+            "idem_complete",
             id="phone_numbers.complete_salvy_registration",
         ),
         pytest.param(
-            lambda client: client.phone_numbers.convert_to_byon("pn/1", idempotency_key="idem"),
+            # A required key is sent trimmed, as validated.
+            lambda client: client.phone_numbers.convert_to_byon(
+                "pn/1", idempotency_key="  idem_convert  "
+            ),
             "POST",
             "https://api.test/v1/phone-numbers/pn%2F1/convert-to-byon",
             {},
+            "idem_convert",
             id="phone_numbers.convert_to_byon",
+        ),
+        pytest.param(
+            lambda client: client.provider_connections.register_salvy(
+                {"api_key": "salvy_test_key", "continuation_terms_version": "salvy_byok_v1"},
+                idempotency_key="idem_register",
+            ),
+            "POST",
+            "https://api.test/v1/provider-connections/salvy",
+            {"api_key": "salvy_test_key", "continuation_terms_version": "salvy_byok_v1"},
+            "idem_register",
+            id="provider_connections.register_salvy",
         ),
         pytest.param(
             lambda client: client.provider_connections.rotate_salvy(
@@ -553,6 +631,7 @@ def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
             "POST",
             "https://api.test/v1/provider-connections/pc%2F1/salvy/rotate",
             {"api_key": "salvy_test_key"},
+            "idem_rotate",
             id="provider_connections.rotate_salvy",
         ),
         pytest.param(
@@ -562,6 +641,7 @@ def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
             "POST",
             "https://api.test/v1/provider-connections/pc%2F1/salvy/discovery",
             {},
+            "idem_refresh",
             id="provider_connections.refresh_salvy_discovery",
         ),
         pytest.param(
@@ -569,22 +649,43 @@ def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
             "GET",
             "https://api.test/v1/provider-connections/pc%2F1/salvy/numbers?limit=5",
             None,
+            None,
             id="provider_connections.list_salvy_numbers",
+        ),
+        pytest.param(
+            lambda client: client.billing.list_phone_management(limit=5, starting_after="pn_1"),
+            "GET",
+            "https://api.test/v1/billing/phone-management?limit=5&starting_after=pn_1",
+            None,
+            None,
+            id="billing.list_phone_management",
+        ),
+        pytest.param(
+            lambda client: client.messages.list(
+                starting_after="msg_1", created_after="2026-11-01T00:00:00Z"
+            ),
+            "GET",
+            "https://api.test/v1/messages?starting_after=msg_1&created_after=2026-11-01T00%3A00%3A00Z",
+            None,
+            None,
+            id="messages.list.created_after",
         ),
         pytest.param(
             lambda client: client.payments.cancel("pay/1", idempotency_key="idem_cancel"),
             "POST",
             "https://api.test/v1/payments/pay%2F1/cancel",
             {},
+            "idem_cancel",
             id="payments.cancel",
         ),
     ],
 )
-def test_groups_orders_diagnostics_salvy_and_cancel_encode_ids_and_send_contract_bodies(
+def test_requests_send_contract_paths_bodies_queries_and_idempotency_keys(
     call: Callable[[Tyxter], object],
     method: str,
     url: str,
     body: dict[str, Any] | None,
+    idempotency_key: str | None,
 ) -> None:
     client, seen = make_client()
 
@@ -594,6 +695,8 @@ def test_groups_orders_diagnostics_salvy_and_cancel_encode_ids_and_send_contract
     assert_request(seen[0], method=method, url=url, body=body)
     if body is None:
         assert not seen[0].content
+    # The caller's key reaches the wire, and no key is invented when none is given.
+    assert seen[0].headers.get("idempotency-key") == idempotency_key
 
 
 def test_messages_retry_transcription_preserves_retry_after_api_errors() -> None:
