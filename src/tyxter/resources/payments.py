@@ -58,6 +58,24 @@ class PaymentsResource(Resource):
             self._request("GET", f"/v1/payments/{path_id('payment_id', payment_id)}"),
         )
 
+    def cancel(
+        self,
+        payment_id: str,
+        *,
+        idempotency_key: str | None = None,
+        trace_id: str | None = None,
+    ) -> PaymentResponse:
+        return cast(
+            PaymentResponse,
+            self._request(
+                "POST",
+                f"/v1/payments/{path_id('payment_id', payment_id)}/cancel",
+                json={},
+                idempotency_key=idempotency_key,
+                trace_id=trace_id,
+            ),
+        )
+
     def request_approval(
         self,
         payment_id: str,

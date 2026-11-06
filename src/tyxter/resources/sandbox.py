@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from tyxter.types import (
+    GroupResponse,
     InboundSandboxMessageRequest,
     MessageResponse,
     PaymentResponse,
+    SandboxGroupParticipantRequest,
     SandboxLLMFailureRequest,
     SandboxLLMFailureResponse,
     SandboxPaymentStatusRequest,
@@ -46,6 +48,7 @@ class SandboxTemplatesResource(Resource):
         template_id: str,
         payload: SandboxTemplateStatusRequest,
         *,
+        idempotency_key: str | None = None,
         trace_id: str | None = None,
     ) -> TemplateResponse:
         return cast(
@@ -54,6 +57,7 @@ class SandboxTemplatesResource(Resource):
                 "POST",
                 f"/v1/sandbox/templates/{path_id('template_id', template_id)}/status",
                 json=payload,
+                idempotency_key=idempotency_key,
                 trace_id=trace_id,
             ),
         )
@@ -76,6 +80,25 @@ class SandboxPaymentsResource(Resource):
                 json=payload,
                 idempotency_key=idempotency_key,
                 trace_id=trace_id,
+            ),
+        )
+
+
+class SandboxGroupsResource(Resource):
+    def simulate_participant(
+        self,
+        group_id: str,
+        payload: SandboxGroupParticipantRequest,
+        *,
+        idempotency_key: str | None = None,
+    ) -> GroupResponse:
+        return cast(
+            GroupResponse,
+            self._request(
+                "POST",
+                f"/v1/sandbox/groups/{path_id('group_id', group_id)}/participants",
+                json=payload,
+                idempotency_key=idempotency_key,
             ),
         )
 
@@ -106,6 +129,7 @@ class SandboxResource(Resource):
         self.inbound_messages = SandboxInboundMessagesResource(self._client)
         self.templates = SandboxTemplatesResource(self._client)
         self.payments = SandboxPaymentsResource(self._client)
+        self.groups = SandboxGroupsResource(self._client)
         self.llm = SandboxLLMResource(self._client)
 
     def quickstart(self) -> SandboxQuickstartResponse:

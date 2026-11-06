@@ -46,11 +46,20 @@ class ApiKeysResource(Resource):
             self._request("GET", f"/v1/api-keys/{path_id('api_key_id', api_key_id)}"),
         )
 
-    def rename(self, api_key_id: str, payload: RenameApiKeyRequest) -> APIKeyResponse:
+    def rename(
+        self,
+        api_key_id: str,
+        payload: RenameApiKeyRequest,
+        *,
+        idempotency_key: str | None = None,
+    ) -> APIKeyResponse:
         return cast(
             APIKeyResponse,
             self._request(
-                "PATCH", f"/v1/api-keys/{path_id('api_key_id', api_key_id)}", json=payload
+                "PATCH",
+                f"/v1/api-keys/{path_id('api_key_id', api_key_id)}",
+                json=payload,
+                idempotency_key=idempotency_key,
             ),
         )
 

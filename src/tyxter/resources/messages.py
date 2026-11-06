@@ -19,7 +19,7 @@ from tyxter.types import (
     TypingIndicatorResponse,
 )
 
-from ._base import Resource, path_id
+from ._base import Resource, path_id, required_idempotency_key
 
 
 class MessagesResource(Resource):
@@ -123,6 +123,7 @@ class MessagesResource(Resource):
         message_id: str,
         payload: RequestMessageMediaTranscription | None = None,
         *,
+        idempotency_key: str | None = None,
         trace_id: str | None = None,
     ) -> MessageMediaTranscriptResponse:
         return cast(
@@ -131,6 +132,7 @@ class MessagesResource(Resource):
                 "POST",
                 f"/v1/messages/{path_id('message_id', message_id)}/transcription",
                 json={} if payload is None else payload,
+                idempotency_key=idempotency_key,
                 trace_id=trace_id,
             ),
         )
@@ -158,10 +160,7 @@ class MessagesResource(Resource):
         idempotency_key: str,
         trace_id: str | None = None,
     ) -> MessageMediaTranscriptResponse:
-        if not isinstance(idempotency_key, str) or not (
-            normalized_idempotency_key := idempotency_key.strip()
-        ):
-            raise ValueError("idempotency_key must be a non-blank string")
+        normalized_idempotency_key = required_idempotency_key(idempotency_key)
         return cast(
             MessageMediaTranscriptResponse,
             self._request(
@@ -192,6 +191,7 @@ class MessagesResource(Resource):
         self,
         message_id: str,
         *,
+        idempotency_key: str | None = None,
         trace_id: str | None = None,
     ) -> TypingIndicatorResponse:
         return cast(
@@ -199,6 +199,7 @@ class MessagesResource(Resource):
             self._request(
                 "POST",
                 f"/v1/messages/{path_id('message_id', message_id)}/typing",
+                idempotency_key=idempotency_key,
                 trace_id=trace_id,
             ),
         )
@@ -212,6 +213,7 @@ class MessagesResource(Resource):
         batch_id: str | None = None,
         direction: MessageDirection | None = None,
         include: Literal["payload"] | None = None,
+        created_after: str | None = None,
     ) -> ListMessagesResponse:
         return cast(
             ListMessagesResponse,
@@ -221,6 +223,7 @@ class MessagesResource(Resource):
                 params={
                     "limit": limit,
                     "starting_after": starting_after,
+                    "created_after": created_after,
                     "status": status,
                     "batch_id": batch_id,
                     "direction": direction,

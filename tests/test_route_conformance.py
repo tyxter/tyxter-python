@@ -42,6 +42,7 @@ SUPPORTED_RESOURCES = {
     "feedback",
     "fiscal",
     "flows",
+    "groups",
     "llm",
     "llm_routes",
     "messages",
@@ -61,6 +62,15 @@ SUPPORTED_RESOURCES = {
 REVIEWED_ROUTE_EXEMPTIONS = {
     "PUT /v1/media/blobs/:param",
     "GET /v1/media/blobs/:param",
+    # Teaching-only refusals for a pasted, unencoded personal WhatsApp invite
+    # link. Their manifest rows state "no idempotency receipt or standalone SDK
+    # method", and the canonical JS route-coverage gate exempts the same six:
+    # groups.retrieve/delete percent-encode the id and reach the same 422.
+    *(
+        f"{method} /v1/groups/{prefix}/*"
+        for prefix in ("https://chat.whatsapp.com", "http://chat.whatsapp.com", "chat.whatsapp.com")
+        for method in ("GET", "DELETE")
+    ),
 }
 
 IdempotencyMode: TypeAlias = Literal["unsupported", "supported", "required"]

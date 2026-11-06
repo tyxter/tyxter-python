@@ -56,13 +56,20 @@ class AutomationsResource(Resource):
             self._request("GET", f"/v1/automations/{path_id('automation_id', automation_id)}"),
         )
 
-    def update(self, automation_id: str, payload: UpdateAutomationRequest) -> AutomationResponse:
+    def update(
+        self,
+        automation_id: str,
+        payload: UpdateAutomationRequest,
+        *,
+        idempotency_key: str | None = None,
+    ) -> AutomationResponse:
         return cast(
             AutomationResponse,
             self._request(
                 "PATCH",
                 f"/v1/automations/{path_id('automation_id', automation_id)}",
                 json=payload,
+                idempotency_key=idempotency_key,
             ),
         )
 
@@ -227,10 +234,14 @@ class AutomationRunsResource(Resource):
             ),
         )
 
-    def cancel(self, run_id: str) -> AutomationRunResponse:
+    def cancel(self, run_id: str, *, idempotency_key: str | None = None) -> AutomationRunResponse:
         return cast(
             AutomationRunResponse,
-            self._request("POST", f"/v1/automation-runs/{path_id('run_id', run_id)}/cancel"),
+            self._request(
+                "POST",
+                f"/v1/automation-runs/{path_id('run_id', run_id)}/cancel",
+                idempotency_key=idempotency_key,
+            ),
         )
 
 

@@ -43,6 +43,16 @@ def path_id(name: str, value: str) -> str:
     return quote(value, safe="")
 
 
+def required_idempotency_key(value: str) -> str:
+    """Validate a caller-supplied key for a route whose manifest requires one.
+
+    Runs before any network I/O, so a blank key never spends a request.
+    """
+    if not isinstance(value, str) or not (normalized := value.strip()):
+        raise ValueError("idempotency_key must be a non-blank string")
+    return normalized
+
+
 def _clean_params(params: QueryParams | None) -> dict[str, QueryValue] | None:
     if params is None:
         return None

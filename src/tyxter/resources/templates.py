@@ -123,6 +123,8 @@ class TemplatesResource(Resource):
         self,
         template_id: str,
         payload: EstimateTemplateCostRequest | None = None,
+        *,
+        idempotency_key: str | None = None,
     ) -> TemplateCostEstimateResponse:
         return cast(
             TemplateCostEstimateResponse,
@@ -130,6 +132,7 @@ class TemplatesResource(Resource):
                 "POST",
                 f"/v1/templates/{path_id('template_id', template_id)}/estimate-cost",
                 json=payload or {},
+                idempotency_key=idempotency_key,
             ),
         )
 

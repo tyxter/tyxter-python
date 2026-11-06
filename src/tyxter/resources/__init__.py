@@ -17,6 +17,7 @@ from .data_retention import DataRetentionResource
 from .feedback import FeedbackResource
 from .fiscal import FiscalResource
 from .flows import FlowsResource
+from .groups import GroupsResource
 from .llm import LLMResource, LLMRoutesResource
 from .media import MediaResource
 from .messages import MessagesResource
@@ -52,6 +53,7 @@ __all__ = [
     "FeedbackResource",
     "FiscalResource",
     "FlowsResource",
+    "GroupsResource",
     "InstagramMessagesResource",
     "LLMResource",
     "LLMRoutesResource",

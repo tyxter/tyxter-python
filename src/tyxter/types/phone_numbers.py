@@ -45,6 +45,111 @@ class TransferPhoneNumberRequest(TypedDict):
     reason: NotRequired[str]
 
 
+class ImportSalvyPhoneNumberRequest(TypedDict):
+    provider_connection_id: str
+    provider_number_id: str
+    meta_phone_number_id: NotRequired[str]
+    display_name: NotRequired[str]
+    continuation_terms_version: Literal["salvy_byok_v1"]
+
+
+class CompleteSalvyPhoneRegistrationRequest(TypedDict):
+    meta_phone_number_id: str
+
+
+class CreatePhoneNumberOrderRequest(TypedDict):
+    ddd: str
+    display_name: NotRequired[str]
+    # Why the number is needed, shown to the owner or admin who approves the order.
+    purpose: NotRequired[str]
+
+
+PhoneNumberOrderStatus: TypeAlias = Literal[
+    "awaiting_approval",
+    "approved",
+    "declined",
+    "expired",
+    "provisioning",
+    "fulfilled",
+    "failed",
+]
+PhoneNumberOrderFailureCode: TypeAlias = Literal[
+    "phone_number_order_declined",
+    "phone_number_order_expired",
+    "phone_number_order_terms_changed",
+]
+
+
+class PhoneNumberOrderPreviewCharge(TypedDict):
+    period_start: str
+    period_end: str
+    # The earliest instant the balance moves for this charge.
+    charged_from: str
+    amount_brl: str
+
+
+class PhoneNumberOrderPreviewActivation(TypedDict):
+    amount_brl: str
+    period_start: str
+    period_end: str
+
+
+class PhoneNumberOrderPreviewFree(TypedDict):
+    status: Literal["free"]
+
+
+class PhoneNumberOrderPreviewForecast(TypedDict):
+    status: Literal["forecast"]
+    computed_at: str
+    activation: PhoneNumberOrderPreviewActivation
+    charges: list[PhoneNumberOrderPreviewCharge]
+
+
+PhoneNumberOrderPreview: TypeAlias = PhoneNumberOrderPreviewFree | PhoneNumberOrderPreviewForecast
+
+
+class PhoneNumberOrderFailure(TypedDict):
+    code: PhoneNumberOrderFailureCode
+    message: str
+
+
+class PhoneNumberOrderResponse(TypedDict):
+    object: Literal["phone_number_order"]
+    id: str
+    status: PhoneNumberOrderStatus
+    project_id: str
+    environment_id: str
+    ddd: str
+    display_name: str | None
+    purpose: str | None
+    preview: PhoneNumberOrderPreview
+    terms_version: str
+    # The dashboard page where an owner or admin approves or declines the order;
+    # None unless the order awaits approval. No API key can approve an order.
+    approval_url: str | None
+    expires_at: str
+    # The phone number the approval started; None before approval.
+    phone_number_id: str | None
+    failure: PhoneNumberOrderFailure | None
+    created_at: str
+    approved_at: str | None
+    declined_at: str | None
+
+
+class SalvyPhoneManagementResponse(TypedDict):
+    provider_connection_id: str
+    provider_number_id: str
+    state: Literal["enabled", "suspended"]
+    coverage: Literal["plan", "prepaid", "none"]
+    covered_until: str | None
+    next_charge_at: str | None
+    next_charge_brl: str | None
+    # None while enabled. An open string: treat an unfamiliar value as not serving.
+    suspension_reason: str | None
+    provider_status: str | None
+    synced_at: str | None
+
+
 PhoneNumberRecentMessageResponse = TypedDict(
     "PhoneNumberRecentMessageResponse",
     {
@@ -86,6 +191,9 @@ class PhoneNumberResponse(TypedDict):
     provider_number_id: str | None
     meta_phone_number_id: str | None
     waba_id: str | None
+    # Optional management of a customer-owned Salvy number. None means ordinary
+    # BYON or a Tyxter-provisioned rental; it never changes `source`.
+    salvy_management: NotRequired[SalvyPhoneManagementResponse | None]
     quality_rating: PhoneQualityRating
     messaging_tier: PhoneMessagingTier
     messaging_limit_tier: str | None

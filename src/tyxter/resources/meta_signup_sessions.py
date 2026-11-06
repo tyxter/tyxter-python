@@ -4,7 +4,7 @@ from typing import cast
 
 from tyxter.types import CreateMetaSignupSessionRequest, MetaSignupSessionResponse
 
-from ._base import Resource, path_id
+from ._base import Resource, path_id, required_idempotency_key
 
 
 class MetaSignupSessionsResource(Resource):
@@ -12,7 +12,7 @@ class MetaSignupSessionsResource(Resource):
         self,
         payload: CreateMetaSignupSessionRequest,
         *,
-        idempotency_key: str | None = None,
+        idempotency_key: str,
     ) -> MetaSignupSessionResponse:
         return cast(
             MetaSignupSessionResponse,
@@ -20,7 +20,7 @@ class MetaSignupSessionsResource(Resource):
                 "POST",
                 "/v1/meta-signup-sessions",
                 json=payload,
-                idempotency_key=idempotency_key,
+                idempotency_key=required_idempotency_key(idempotency_key),
             ),
         )
 

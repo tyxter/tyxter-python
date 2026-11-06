@@ -24,6 +24,7 @@ from .resources import (
     FeedbackResource,
     FiscalResource,
     FlowsResource,
+    GroupsResource,
     InstagramMessagesResource,
     LLMResource,
     LLMRoutesResource,
@@ -105,6 +106,7 @@ class Tyxter:
         self.feedback = FeedbackResource(self)
         self.fiscal = FiscalResource(self)
         self.flows = FlowsResource(self)
+        self.groups = GroupsResource(self)
         self.llm = LLMResource(self)
         self.llm_routes = LLMRoutesResource(self)
         self.webhook_endpoints = WebhookEndpointsResource(self)

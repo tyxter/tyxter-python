@@ -16,6 +16,7 @@ from tyxter.types import (
     ListBillingPaymentMethodsResponse,
     ListInvoicesResponse,
     ListLedgerEntriesResponse,
+    ListPhoneManagementResponse,
     ListPhoneRenewalsResponse,
     ListPlansResponse,
     PhoneRenewalResponse,
@@ -247,6 +248,21 @@ class BillingResource(Resource):
             self._request(
                 "GET",
                 f"/v1/billing/phone-renewals/{path_id('cycle_id', cycle_id)}",
+            ),
+        )
+
+    def list_phone_management(
+        self,
+        *,
+        limit: int | None = None,
+        starting_after: str | None = None,
+    ) -> ListPhoneManagementResponse:
+        return cast(
+            ListPhoneManagementResponse,
+            self._request(
+                "GET",
+                "/v1/billing/phone-management",
+                params={"limit": limit, "starting_after": starting_after},
             ),
         )
 

@@ -47,10 +47,15 @@ from tyxter.types import (
     MessageReadSenderIdentity,
     MessageResponse,
     MessageSummaryResponse,
+    MetaDiagnosticsFailure,
+    MetaDiagnosticsPhoneFacts,
+    MetaDiagnosticsResponse,
     NativePixOrderDetailsMessagePayload,
     PhoneLessInboundSenderIdentity,
     PhoneMessagingTier,
     PhoneNumberNameReviewResponse,
+    PhoneNumberOrderPreviewCharge,
+    PhoneNumberOrderResponse,
     PhoneNumberPendingNameReviewResponse,
     PhoneNumberResponse,
     PhoneRenewalResponse,
@@ -829,6 +834,37 @@ def a3_error_discovery_fixture() -> TyxterErrorBody:
     )
     a3_error_discovery_shape(error)
     return error
+
+
+def diagnostics_and_rental_order_usage(client: Tyxter) -> None:
+    meta_diagnostics_and_order_narrowing(
+        client.phone_numbers.request_meta_diagnostics(
+            "pn_123", {"sandbox_scenario": "message_quality_medium"}
+        ),
+        client.phone_numbers.create_order({"ddd": "11", "purpose": "Support line"}),
+    )
+    meta_diagnostics_and_order_narrowing(
+        client.phone_numbers.get_meta_diagnostics("pn_123"),
+        client.phone_numbers.retrieve_order("ord_123"),
+    )
+
+
+def meta_diagnostics_and_order_narrowing(
+    diagnostics: MetaDiagnosticsResponse, order: PhoneNumberOrderResponse
+) -> None:
+    phone = diagnostics["phone"]
+    if phone is not None:
+        if phone["status"] == "ok":
+            assert_type(phone["facts"], MetaDiagnosticsPhoneFacts)
+        else:
+            assert_type(phone["failure"], MetaDiagnosticsFailure)
+    # "unknown" stays distinct from False: a missing fact is not a refusal.
+    can_send = diagnostics["capabilities"]["can_send"]["value"]
+    if not isinstance(can_send, bool):
+        assert_type(can_send, Literal["unknown"])
+    preview = order["preview"]
+    if preview["status"] == "forecast":
+        assert_type(preview["charges"], list[PhoneNumberOrderPreviewCharge])
 
 
 def provider_credential_setup_result_narrowing(

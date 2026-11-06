@@ -52,10 +52,21 @@ class AIAgentsResource(Resource):
             self._request("GET", f"/v1/ai-agents/{path_id('agent_id', agent_id)}"),
         )
 
-    def update(self, agent_id: str, payload: UpdateAIAgentRequest) -> AIAgentResponse:
+    def update(
+        self,
+        agent_id: str,
+        payload: UpdateAIAgentRequest,
+        *,
+        idempotency_key: str | None = None,
+    ) -> AIAgentResponse:
         return cast(
             AIAgentResponse,
-            self._request("PATCH", f"/v1/ai-agents/{path_id('agent_id', agent_id)}", json=payload),
+            self._request(
+                "PATCH",
+                f"/v1/ai-agents/{path_id('agent_id', agent_id)}",
+                json=payload,
+                idempotency_key=idempotency_key,
+            ),
         )
 
     def delete(self, agent_id: str) -> DeleteAIAgentResponse:

@@ -75,7 +75,10 @@ class WebhookEventsResource(Resource):
         )
 
     def create_listen_session(
-        self, payload: CreateWebhookListenSessionRequest | None = None
+        self,
+        payload: CreateWebhookListenSessionRequest | None = None,
+        *,
+        idempotency_key: str | None = None,
     ) -> WebhookListenSessionResponse:
         return cast(
             WebhookListenSessionResponse,
@@ -83,6 +86,7 @@ class WebhookEventsResource(Resource):
                 "POST",
                 "/v1/webhook-events/listen-sessions",
                 json=payload or {},
+                idempotency_key=idempotency_key,
             ),
         )
 

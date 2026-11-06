@@ -13,7 +13,69 @@ published JavaScript tag in these notes.
 
 ## [Unreleased]
 
-No unreleased changes.
+This section brings the SDK back in line with the canonical public-API manifest synced from
+Tyxter Messaging `e253e046739889d2bd2d32c4798e3864ba9f9290`, against which
+`tests/test_route_conformance.py` had failed. Request and response types follow the canonical
+contracts at Messaging `e7a008dc00ab2184a1c76b3f8aa6c1086f8ee0c7`, whose route and query snapshots
+are byte-identical to the vendored copies. These entries do not claim parity with a published
+`sdk-js` release.
+
+### Removed (breaking)
+
+- `provider_connections.register_meta()` and `provider_connections.rotate_token()`, their
+  `RegisterMetaConnectionRequest` and `RotateProviderConnectionTokenRequest` types, and
+  `MetaOnboardingConfigResponse.manual_credentials_endpoint`. They called
+  `POST /v1/provider-connections/meta` and `POST /v1/provider-connections/{connection_id}/rotate`,
+  routes the API has removed, so every call already failed. No deprecated shim is kept, because a
+  shim could only call a dead route. Connect a Meta account through Embedded Signup with
+  `exchange_meta_oauth()` or a hosted `meta_signup_sessions` session, and replace an existing
+  connection's credential by sending a fresh Embedded Signup code to `exchange_meta_oauth()`.
+
+### Changed (breaking)
+
+- `meta_signup_sessions.create()` requires a caller-supplied, nonblank `idempotency_key` and
+  rejects a blank one before any request. The API now requires `Idempotency-Key` on
+  `POST /v1/meta-signup-sessions` so the one-time launch URL replays deterministically, and
+  refuses a request without one.
+
+### Added
+
+- WhatsApp Business groups: `groups.retrieve_eligibility()`,
+  `groups.create_eligibility_check()`, `groups.create()`, `groups.list()`, `groups.retrieve()`,
+  `groups.delete()`, `groups.reset_invite_link()`, and
+  `sandbox.groups.simulate_participant()`, with `GroupResponse`, `GroupEligibilityResponse`,
+  `ListGroupsResponse` and their request types. The six teaching-only personal-invite routes under
+  `/v1/groups/<invite host>/*` have no SDK method, as their manifest rows state.
+- Meta diagnostics: `phone_numbers.request_meta_diagnostics()` and
+  `phone_numbers.get_meta_diagnostics()`, with `MetaDiagnosticsResponse` and its section,
+  capability and check types. A capability `value` of `"unknown"` stays distinct from `False`.
+- Phone number rental orders: `phone_numbers.create_order()` and `phone_numbers.retrieve_order()`,
+  with `CreatePhoneNumberOrderRequest` and `PhoneNumberOrderResponse`.
+- Customer-owned Salvy numbers: `provider_connections.register_salvy()`, `rotate_salvy()`,
+  `refresh_salvy_discovery()` and `list_salvy_numbers()`; `phone_numbers.import_salvy()`,
+  `complete_salvy_registration()` and `convert_to_byon()`; and `billing.list_phone_management()`.
+  The writes require a caller-supplied idempotency key. `ProviderName` and
+  `ProviderCredentialSetupTarget` gain `"salvy"`, `ProviderConnectionChannel` gains
+  `"phone_numbers"`, `ProviderConnectionResponse` gains optional `salvy`, and
+  `PhoneNumberResponse` gains optional `salvy_management`.
+- `payments.cancel()`, with optional `idempotency_key` and `trace_id`.
+- `messages.list(created_after=...)`.
+- Optional `idempotency_key` on `ai_agents.update()`, `api_keys.rename()`, `automations.update()`,
+  `automation_runs.cancel()`, `llm_routes.update()`, `messages.request_transcription()`,
+  `messages.typing()`, `sandbox.templates.set_status()`, `templates.estimate_cost()` and
+  `webhook_events.create_listen_session()`, whose routes now honor `Idempotency-Key`.
+
+### Fixed
+
+- `MetaSignupSessionResponse` types the `"failed"` status and the optional `error`
+  (`MetaSignupFailure`: `code` `meta_signup_session_expired`, `reason`, `message` and a `feedback`
+  pointer) that `meta_signup_sessions.retrieve()` returns when a hosted signup handoff fails. Start a
+  new session rather than exchanging a late code.
+- `MetaOnboardingConfigResponse` types `login_options.extras.version` as `"v4"`, the Embedded
+  Signup version the API returns; it was `"v3"`.
+- Package metadata: the Homepage URL pointed at `docs.tyxter.com`, which does not resolve; it now
+  points at `https://tyxter.com/docs`. The Repository and Changelog URLs point at
+  `tyxter/tyxter-python`.
 
 ## [0.8.0] - 2026-09-03
 
