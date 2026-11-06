@@ -14,7 +14,11 @@ published JavaScript tag in these notes.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Documentation
+
+- The README no longer describes 0.12.0 as an unpublished candidate or says PyPI serves 0.8.0.
+  It links the PyPI package page, the npm package and the releases page, and the package metadata
+  adds a Releases URL.
 
 ## [0.12.0] - 2026-11-06
 

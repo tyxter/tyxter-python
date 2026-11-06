@@ -40,6 +40,7 @@ dev = [
 Homepage = "https://tyxter.com/docs"
 Repository = "https://github.com/tyxter/tyxter-python"
 Changelog = "https://github.com/tyxter/tyxter-python/blob/main/CHANGELOG.md"
+Releases = "https://github.com/tyxter/tyxter-python/releases"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tyxter"]
