@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing_extensions import deprecated
 
 from tyxter.message_builders import (
-    _WHATSAPP_CHANNEL_DEPRECATION,
     _whatsapp_channel_media,
     _whatsapp_channel_text,
     instagram_media,
@@ -143,7 +142,11 @@ class WhatsAppChannelsResource:
     def __init__(self, messages: MessagesResource) -> None:
         self._messages = messages
 
-    @deprecated(_WHATSAPP_CHANNEL_DEPRECATION)
+    @deprecated(
+        "WhatsApp Channel publishing is unsupported: the API rejects this request with "
+        "invalid_message_request. Use client.whatsapp for one-to-one sends.",
+        category=None,
+    )
     def publish_text(
         self,
         input: WhatsAppChannelTextMessageInput,
@@ -155,7 +158,11 @@ class WhatsAppChannelsResource:
             _whatsapp_channel_text(input), idempotency_key=idempotency_key, trace_id=trace_id
         )
 
-    @deprecated(_WHATSAPP_CHANNEL_DEPRECATION)
+    @deprecated(
+        "WhatsApp Channel publishing is unsupported: the API rejects this request with "
+        "invalid_message_request. Use client.whatsapp for one-to-one sends.",
+        category=None,
+    )
     def publish_media(
         self,
         input: WhatsAppChannelMediaMessageInput,

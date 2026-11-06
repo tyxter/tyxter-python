@@ -129,6 +129,8 @@ def test_purchase_package_preserves_promotion_response_without_promotion_request
     assert body(seen[0]) == {"package_code": "pkg_10k", "payment_method": "card"}
 
 
+# Canonical deprecates these reads for type checkers only; they must not warn at runtime.
+@pytest.mark.filterwarnings("error::DeprecationWarning")
 def test_phone_renewals_use_exact_query_and_encoded_cycle_paths() -> None:
     seen: list[httpx.Request] = []
     renewal = {
@@ -172,12 +174,10 @@ def test_phone_renewals_use_exact_query_and_encoded_cycle_paths() -> None:
         transport=httpx.MockTransport(handler),
     )
 
-    with pytest.warns(DeprecationWarning, match="Read `renewal` on phone_numbers"):
-        listed = client.billing.list_phone_renewals(
-            limit=5, starting_after="phr_0", status="funding_required"
-        )
-    with pytest.warns(DeprecationWarning, match="Read `renewal` on phone_numbers"):
-        retrieved = client.billing.retrieve_phone_renewal("phr/1")
+    listed = client.billing.list_phone_renewals(
+        limit=5, starting_after="phr_0", status="funding_required"
+    )
+    retrieved = client.billing.retrieve_phone_renewal("phr/1")
 
     assert listed["data"][0]["recommended_action"] == "add_credit_or_enable_auto_topup"
     assert retrieved["actionable_state"] == "at_risk"

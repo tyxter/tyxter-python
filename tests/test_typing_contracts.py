@@ -605,3 +605,61 @@ group: WhatsAppGroupRecipientIdentity = {
     assert 'Missing key "emoji"' in output
     assert 'TypedDict item "reason"' in output
     assert 'Extra key "profile_name"' in output
+
+
+def test_canonical_deprecations_reach_type_checkers(tmp_path: Path) -> None:
+    fixture = tmp_path / "deprecated_calls.py"
+    fixture.write_text(
+        """\\
+from tyxter import Tyxter
+from tyxter.message_builders import whatsapp_channel_media, whatsapp_channel_text
+
+client = Tyxter(api_key="tx_sandbox_test")
+client.whatsapp_channels.publish_text({"channel_id": "ch", "body": "x"})
+client.whatsapp_channels.publish_media({"channel_id": "ch", "media": {"kind": "image"}})
+whatsapp_channel_text({"channel_id": "ch", "body": "x"})
+whatsapp_channel_media({"channel_id": "ch", "media": {"kind": "image"}})
+client.billing.list_phone_renewals()
+client.billing.retrieve_phone_renewal("phr_1")
+""",
+        encoding="utf-8",
+    )
+    environment = os.environ.copy()
+    source_path = str(PACKAGE_ROOT / "src")
+    environment["MYPYPATH"] = (
+        source_path
+        if not environment.get("MYPYPATH")
+        else os.pathsep.join((source_path, environment["MYPYPATH"]))
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mypy",
+            "--strict",
+            "--enable-error-code",
+            "deprecated",
+            str(fixture),
+        ],
+        cwd=PACKAGE_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    output = result.stdout + result.stderr
+    deprecated = {
+        line.split(" is deprecated")[0].rsplit(" ", 1)[-1]
+        for line in output.splitlines()
+        if "[deprecated]" in line
+    }
+    assert deprecated == {
+        "tyxter.resources.channel_messages.WhatsAppChannelsResource.publish_text",
+        "tyxter.resources.channel_messages.WhatsAppChannelsResource.publish_media",
+        "tyxter.message_builders.whatsapp_channel_text",
+        "tyxter.message_builders.whatsapp_channel_media",
+        "tyxter.resources.billing.BillingResource.list_phone_renewals",
+        "tyxter.resources.billing.BillingResource.retrieve_phone_renewal",
+    }, output

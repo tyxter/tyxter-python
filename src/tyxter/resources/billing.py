@@ -33,11 +33,6 @@ from tyxter.types import (
 
 from ._base import Resource, path_id
 
-_PHONE_RENEWALS_DEPRECATION = (
-    "Phone renewal history is retired: no new cycle is recorded. Read `renewal` on "
-    "phone_numbers.list() or phone_numbers.retrieve() for each number's current month."
-)
-
 
 class BillingResource(Resource):
     def balance(self) -> CreditBalanceResponse:
@@ -233,7 +228,11 @@ class BillingResource(Resource):
             ),
         )
 
-    @deprecated(_PHONE_RENEWALS_DEPRECATION)
+    @deprecated(
+        "Phone renewal history is retired and records no new cycle. Read `renewal` on "
+        "phone_numbers.list() or phone_numbers.retrieve() instead.",
+        category=None,
+    )
     def list_phone_renewals(
         self,
         *,
@@ -255,7 +254,11 @@ class BillingResource(Resource):
             ),
         )
 
-    @deprecated(_PHONE_RENEWALS_DEPRECATION)
+    @deprecated(
+        "Phone renewal history is retired and records no new cycle. Read `renewal` on "
+        "phone_numbers.list() or phone_numbers.retrieve() instead.",
+        category=None,
+    )
     def retrieve_phone_renewal(self, cycle_id: str) -> PhoneRenewalResponse:
         """Deprecated: read ``renewal`` on ``phone_numbers.retrieve()`` instead."""
         return cast(
