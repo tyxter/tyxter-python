@@ -6,7 +6,9 @@ from typing_extensions import NotRequired, TypedDict
 
 from .common import Environment
 
-MetaSignupSessionStatus: TypeAlias = Literal["pending", "processing", "completed", "expired"]
+MetaSignupSessionStatus: TypeAlias = Literal[
+    "pending", "processing", "completed", "expired", "failed"
+]
 
 
 class CreateMetaSignupSessionRequest(TypedDict):
@@ -14,10 +16,25 @@ class CreateMetaSignupSessionRequest(TypedDict):
     end_customer_ref: NotRequired[str]
 
 
+class MetaSignupFailureFeedback(TypedDict):
+    endpoint: Literal["/v1/feedback"]
+    method: Literal["POST"]
+
+
+class MetaSignupFailure(TypedDict):
+    """A terminal browser-handoff failure. Start a new session; do not exchange a late code."""
+
+    code: Literal["meta_signup_session_expired"]
+    reason: Literal["meta_signup_callback_lost", "popup_no_return"]
+    message: str
+    feedback: MetaSignupFailureFeedback
+
+
 class MetaSignupSessionResponse(TypedDict):
     id: str
     object: Literal["meta_signup_session"]
     status: MetaSignupSessionStatus
+    error: NotRequired[MetaSignupFailure]
     url: str | None
     return_url: str
     end_customer_ref: str | None

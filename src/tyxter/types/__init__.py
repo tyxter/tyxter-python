@@ -346,6 +346,8 @@ from .meta_diagnostics import (
 )
 from .meta_signup_sessions import (
     CreateMetaSignupSessionRequest,
+    MetaSignupFailure,
+    MetaSignupFailureFeedback,
     MetaSignupSessionResponse,
     MetaSignupSessionStatus,
 )
@@ -794,6 +796,8 @@ __all__ = [
     "MetaDiagnosticsWabaSection",
     "MetaDiagnosticsWabaSectionOk",
     "MetaOnboardingConfigResponse",
+    "MetaSignupFailure",
+    "MetaSignupFailureFeedback",
     "MetaSignupSessionResponse",
     "MetaSignupSessionStatus",
     "MetaThroughputTier",

@@ -67,6 +67,10 @@ are byte-identical to the vendored copies. These entries do not claim parity wit
 
 ### Fixed
 
+- `MetaSignupSessionResponse` types the `"failed"` status and the optional `error`
+  (`MetaSignupFailure`: `code` `meta_signup_session_expired`, `reason`, `message` and a `feedback`
+  pointer) that `meta_signup_sessions.retrieve()` returns when a hosted signup handoff fails. Start a
+  new session rather than exchanging a late code.
 - `MetaOnboardingConfigResponse` types `login_options.extras.version` as `"v4"`, the Embedded
   Signup version the API returns; it was `"v3"`.
 - Package metadata: the Homepage URL pointed at `docs.tyxter.com`, which does not resolve; it now
