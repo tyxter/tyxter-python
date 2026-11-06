@@ -5,7 +5,7 @@ from typing import Literal, TypeAlias
 from typing_extensions import NotRequired, Required, TypedDict
 
 from .common import JSONObject
-from .messages import MediaMessagePayload, MessageChannel
+from .messages import MediaMessagePayload, MessageChannel, ReactionMessagePayload
 
 
 class SandboxInboundUnsupportedInput(TypedDict):
@@ -21,8 +21,13 @@ InboundSandboxMessageRequest = TypedDict(
     {
         "from": Required[str],
         "to": Required[str],
-        "type": Required[Literal["text", "media", "interactive", "flow", "unsupported", "unknown"]],
+        "type": Required[
+            Literal["text", "media", "interactive", "flow", "reaction", "unsupported", "unknown"]
+        ],
+        # Tyxter group id: `to` names its host phone number and `from` the participant.
+        "group_id": NotRequired[str],
         "channel": NotRequired[MessageChannel],
+        "reaction": NotRequired[ReactionMessagePayload],
         "text": NotRequired[dict[Literal["body"], str]],
         "media": NotRequired[MediaMessagePayload],
         "interactive": NotRequired[JSONObject],

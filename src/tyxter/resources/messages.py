@@ -249,6 +249,8 @@ def _message_request(
         "recipient": payload["recipient"],
         "message": message,
     }
+    if "reply_to" in payload:
+        request["reply_to"] = payload["reply_to"]
     if "metadata" in payload:
         request["metadata"] = payload["metadata"]
     return request

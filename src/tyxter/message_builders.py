@@ -9,6 +9,7 @@ from tyxter.types import (
     MessageChannel,
     MessageIdentityType,
     MessageRecipient,
+    MessageReplyTo,
     OutboundMessage,
     StructuredPhoneInput,
     TemplateMessagePayload,
@@ -36,6 +37,7 @@ def whatsapp_text(input: WhatsAppTextMessageInput) -> CreateMessageRequest:
         recipient_id=input["to"],
         message={"type": "text", "text": text},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -48,6 +50,7 @@ def whatsapp_media(input: WhatsAppMediaMessageInput) -> CreateMessageRequest:
         recipient_id=input["to"],
         message={"type": "media", "media": input["media"]},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -61,6 +64,7 @@ def whatsapp_audio_from_text(input: WhatsAppTTSMessageInput) -> CreateMessageReq
         recipient_id=input["to"],
         message={"type": "media", "media": media},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -83,6 +87,7 @@ def whatsapp_template(input: WhatsAppTemplateMessageInput) -> CreateMessageReque
         recipient_id=input["to"],
         message={"type": "template", "template": template},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -95,6 +100,7 @@ def whatsapp_interactive(input: WhatsAppInteractiveMessageInput) -> CreateMessag
         recipient_id=input["to"],
         message={"type": "interactive", "interactive": input["interactive"]},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -107,6 +113,7 @@ def whatsapp_flow(input: WhatsAppFlowMessageInput) -> CreateMessageRequest:
         recipient_id=input["to"],
         message={"type": "flow", "flow": input["flow"]},
         metadata=input.get("metadata"),
+        reply_to=input.get("reply_to"),
     )
 
 
@@ -173,6 +180,7 @@ def _request(
     recipient_id: str | StructuredPhoneInput,
     message: OutboundMessage,
     metadata: JSONObject | None,
+    reply_to: MessageReplyTo | None = None,
 ) -> CreateMessageRequest:
     recipient: MessageRecipient
     if isinstance(recipient_id, str):
@@ -190,6 +198,8 @@ def _request(
         "recipient": recipient,
         "message": message,
     }
+    if reply_to is not None:
+        request["reply_to"] = reply_to
     if metadata is not None:
         request["metadata"] = metadata
     return request

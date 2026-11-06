@@ -15,8 +15,9 @@ MessageIdentityType: TypeAlias = Literal[
     "instagram_user",
     "whatsapp_channel",
     "whatsapp_channel_audience",
+    "whatsapp_group",
 ]
-MessageKind: TypeAlias = Literal["text", "template", "media", "interactive", "flow"]
+MessageKind: TypeAlias = Literal["text", "template", "media", "interactive", "flow", "reaction"]
 MediaKind: TypeAlias = Literal["image", "document", "audio", "video", "sticker"]
 VariableValue: TypeAlias = str | int | bool
 
@@ -27,11 +28,28 @@ class MessageIdentity(TypedDict):
 
 
 class PhoneLessInboundSenderIdentity(TypedDict):
+    """Output-only fallback for a phone-less inbound WhatsApp sender on message reads."""
+
     type: Literal["phone_e164"]
     id: Literal[""]
+    # Always None for a phone-less sender; current reads include it.
+    profile_name: NotRequired[str | None]
 
 
-MessageReadSenderIdentity: TypeAlias = MessageIdentity | PhoneLessInboundSenderIdentity
+class MessageReadSender(MessageIdentity):
+    """A message read's sender, with the captured inbound WhatsApp profile name.
+
+    ``profile_name`` is captured inbound profile evidence, not a verified identity or business
+    display name. It is ``None`` on the default payload-less list, outbound and non-WhatsApp
+    messages, phone-less rows, malformed captures and redacted rows. Recipients and request
+    identities never carry it. Current reads always include it; it is ``NotRequired`` so
+    existing response constructors keep type-checking.
+    """
+
+    profile_name: NotRequired[str | None]
+
+
+MessageReadSenderIdentity: TypeAlias = MessageReadSender | PhoneLessInboundSenderIdentity
 
 
 class StructuredPhoneRecipient(TypedDict):
@@ -40,12 +58,37 @@ class StructuredPhoneRecipient(TypedDict):
     national_number: str
 
 
+class WhatsAppGroupRecipientIdentity(TypedDict):
+    """An active WhatsApp Business group, addressed by its Tyxter group id.
+
+    Send from the phone number that hosts the group.
+    """
+
+    type: Literal["whatsapp_group"]
+    id: str
+
+
+class MessageReplyTo(TypedDict):
+    """Quote a Tyxter message in the same environment and conversation."""
+
+    message_id: str
+
+
+class ReactionMessagePayload(TypedDict):
+    # Tyxter inbound WhatsApp message ID in this conversation.
+    message_id: str
+    # One emoji; an empty string removes the reaction.
+    emoji: str
+
+
 class StructuredPhoneInput(TypedDict):
     country_calling_code: str
     national_number: str
 
 
-MessageRecipient: TypeAlias = MessageIdentity | StructuredPhoneRecipient
+MessageRecipient: TypeAlias = (
+    MessageIdentity | StructuredPhoneRecipient | WhatsAppGroupRecipientIdentity
+)
 
 
 class TextMessagePayload(TypedDict):
@@ -225,6 +268,8 @@ class OutboundMessage(TypedDict):
     media: NotRequired[MediaMessagePayload | InstagramMediaMessagePayload]
     interactive: NotRequired[InteractivePayload]
     flow: NotRequired[FlowMessagePayload]
+    # WhatsApp only.
+    reaction: NotRequired[ReactionMessagePayload]
 
 
 class CreateMessageRequest(TypedDict):
@@ -232,46 +277,58 @@ class CreateMessageRequest(TypedDict):
     sender: MessageIdentity
     recipient: MessageRecipient
     message: OutboundMessage
+    # WhatsApp only.
+    reply_to: NotRequired[MessageReplyTo]
     metadata: NotRequired[JSONObject]
 
 
 class SendTextMessageInput(TypedDict):
     channel: MessageChannel
     sender: MessageIdentity
-    recipient: MessageIdentity
+    recipient: MessageRecipient
     text: TextMessagePayload
+    # WhatsApp only.
+    reply_to: NotRequired[MessageReplyTo]
     metadata: NotRequired[JSONObject]
 
 
 class SendTemplateMessageInput(TypedDict):
     channel: MessageChannel
     sender: MessageIdentity
-    recipient: MessageIdentity
+    recipient: MessageRecipient
     template: TemplateMessagePayload
+    # WhatsApp only.
+    reply_to: NotRequired[MessageReplyTo]
     metadata: NotRequired[JSONObject]
 
 
 class SendMediaMessageInput(TypedDict):
     channel: MessageChannel
     sender: MessageIdentity
-    recipient: MessageIdentity
+    recipient: MessageRecipient
     media: MediaMessagePayload
+    # WhatsApp only.
+    reply_to: NotRequired[MessageReplyTo]
     metadata: NotRequired[JSONObject]
 
 
 class SendInteractiveMessageInput(TypedDict):
     channel: MessageChannel
     sender: MessageIdentity
-    recipient: MessageIdentity
+    recipient: MessageRecipient
     interactive: InteractivePayload
+    # WhatsApp only.
+    reply_to: NotRequired[MessageReplyTo]
     metadata: NotRequired[JSONObject]
 
 
 class SendFlowMessageInput(TypedDict):
     channel: MessageChannel
     sender: MessageIdentity
-    recipient: MessageIdentity
+    recipient: MessageRecipient
     flow: FlowMessagePayload
+    # WhatsApp only.
+    reply_to: NotRequired[MessageReplyTo]
     metadata: NotRequired[JSONObject]
 
 
@@ -326,6 +383,8 @@ class _InboundMessageMediaBase(TypedDict):
     filename: str | None
     provider_media_id: NotRequired[str]
     voice: NotRequired[bool]
+    # Sticker only: True when animated, False when static; omitted when Meta sent no signal.
+    animated: NotRequired[bool]
 
 
 class InboundMessageMediaConsumed(_InboundMessageMediaBase):
@@ -368,6 +427,17 @@ class InboundUnknownDescriptor(TypedDict):
     provider_type: str | None
 
 
+class MessageContextReplyTo(TypedDict):
+    message_id: str | None
+    provider_message_id: str
+
+
+class MessageContext(TypedDict):
+    reply_to: MessageContextReplyTo | None
+    forwarded: bool
+    frequently_forwarded: bool
+
+
 class MessageSummaryResponse(TypedDict):
     id: str
     object: Literal["message"]
@@ -390,6 +460,8 @@ class MessageSummaryResponse(TypedDict):
     unknown: NotRequired[InboundUnknownDescriptor | None]
     payload: JSONValue | None
     metadata: JSONValue | None
+    # Quote (`reply_to`) and forwarding facts.
+    context: NotRequired[MessageContext | None]
     error_code: str | None
     error_message: str | None
     provider_error: MessageProviderError | None
@@ -410,6 +482,13 @@ class MessageDetailResponse(MessageSummaryResponse):
 
 
 class RequestMessageMediaTranscription(TypedDict):
+    # Advisory context, trimmed; at most 1024 UTF-16 code units. An empty string clears it, and
+    # a retry that omits it inherits the previous value.
+    prompt: NotRequired[str]
+    # At most 50 trimmed terms of 1-128 UTF-16 code units, without line separators or angle
+    # brackets. Order, case and duplicates are kept. An empty list clears them, and a retry
+    # that omits them inherits the previous value.
+    keywords: NotRequired[list[str]]
     language: NotRequired[str]
 
 
@@ -454,6 +533,7 @@ WhatsAppTextMessageInput = TypedDict(
         "to": Required[str | StructuredPhoneInput],
         "body": Required[str],
         "preview_url": NotRequired[bool],
+        "reply_to": NotRequired[MessageReplyTo],
         "metadata": NotRequired[JSONObject],
     },
     total=False,
@@ -465,6 +545,7 @@ WhatsAppMediaMessageInput = TypedDict(
         "from": Required[str],
         "to": Required[str | StructuredPhoneInput],
         "media": Required[MediaMessagePayload],
+        "reply_to": NotRequired[MessageReplyTo],
         "metadata": NotRequired[JSONObject],
     },
     total=False,
@@ -476,6 +557,7 @@ WhatsAppTTSMessageInput = TypedDict(
         "from": Required[str],
         "to": Required[str | StructuredPhoneInput],
         "tts": Required[TTSMediaSource],
+        "reply_to": NotRequired[MessageReplyTo],
         "metadata": NotRequired[JSONObject],
     },
     total=False,
@@ -491,6 +573,7 @@ WhatsAppTemplateMessageInput = TypedDict(
         "variables": NotRequired[dict[str, VariableValue]],
         "components": NotRequired[list[JSONObject]],
         "header_media": NotRequired[TemplateHeaderMedia],
+        "reply_to": NotRequired[MessageReplyTo],
         "metadata": NotRequired[JSONObject],
     },
     total=False,
@@ -502,6 +585,7 @@ WhatsAppInteractiveMessageInput = TypedDict(
         "from": Required[str],
         "to": Required[str | StructuredPhoneInput],
         "interactive": Required[InteractivePayload],
+        "reply_to": NotRequired[MessageReplyTo],
         "metadata": NotRequired[JSONObject],
     },
     total=False,
@@ -513,6 +597,7 @@ WhatsAppFlowMessageInput = TypedDict(
         "from": Required[str],
         "to": Required[str | StructuredPhoneInput],
         "flow": Required[FlowMessagePayload],
+        "reply_to": NotRequired[MessageReplyTo],
         "metadata": NotRequired[JSONObject],
     },
     total=False,
