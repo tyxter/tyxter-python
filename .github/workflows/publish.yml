@@ -98,6 +98,22 @@ jobs:
             exit 1
           fi
 
+          # The GitHub release is cut from tag v<version> after the upload. A dispatch from a
+          # commit the tag does not mark would leave PyPI and the tag disagreeing; refuse first.
+          release_tag="v$package_version"
+          tag_commit="$(git rev-parse -q --verify "refs/tags/$release_tag^{commit}" || true)"
+          published_commit="$(git rev-parse "$GITHUB_SHA^{commit}")"
+          if [[ -n "$tag_commit" && "$tag_commit" != "$published_commit" ]]; then
+            echo "::error::Tag $release_tag points at $tag_commit, not $published_commit. Publish $package_version from the tagged commit."
+            exit 1
+          fi
+
+          # The GitHub release notes come from this section; refuse before PyPI, not after.
+          if ! python scripts/release_notes.py "$package_version" > /dev/null; then
+            echo "::error::CHANGELOG.md needs a '## [$package_version]' section with entries before $package_version can be published."
+            exit 1
+          fi
+
           PYPI_VERSION="$package_version" python - <<'PY'
           import os
           import urllib.error
@@ -196,3 +212,66 @@ jobs:
         with:
           packages-dir: dist/
           attestations: true
+
+  github-release:
+    name: Create GitHub release v${{ needs.release-metadata.outputs.version }}
+    needs:
+      - release-metadata
+      - publish
+    runs-on: ubuntu-latest
+    # The only job that can write releases; the PyPI job keeps read-only contents.
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          # gh reads GH_TOKEN; keep the write-scoped token out of .git/config.
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_CHANNEL: ${{ needs.release-metadata.outputs.release_channel }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # A tag push always has its tag. A manual dispatch gets a release only when tag
+          # v<version> already exists on the published commit; this workflow never creates tags.
+          # release-metadata already refused a mismatched tag; this re-check catches a tag that
+          # moved during the run.
+          release_tag="v$VERSION"
+          tag_commit="$(git rev-parse -q --verify "refs/tags/$release_tag^{commit}" || true)"
+          published_commit="$(git rev-parse "$GITHUB_SHA^{commit}")"
+          if [[ -z "$tag_commit" ]]; then
+            echo "::warning::tyxter $VERSION is on PyPI, but tag $release_tag does not exist, so no GitHub release was created. Push $release_tag at $published_commit, then run: gh release create $release_tag --verify-tag --title 'Tyxter Python SDK $release_tag' --notes-file <(python scripts/release_notes.py $VERSION)"
+            exit 0
+          fi
+          if [[ "$tag_commit" != "$published_commit" ]]; then
+            echo "::error::Tag $release_tag points at $tag_commit, not the published commit $published_commit."
+            exit 1
+          fi
+
+          if gh release view "$release_tag" > /dev/null 2>&1; then
+            echo "Release $release_tag already exists"
+            exit 0
+          fi
+
+          notes_file="$RUNNER_TEMP/release-notes.md"
+          python scripts/release_notes.py "$VERSION" > "$notes_file"
+          flags=(--latest=false --prerelease)
+          if [[ "$RELEASE_CHANNEL" == "stable" ]]; then
+            flags=(--latest)
+          fi
+          gh release create "$release_tag" --verify-tag \
+            --title "Tyxter Python SDK $release_tag" \
+            --notes-file "$notes_file" "${flags[@]}"
