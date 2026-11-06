@@ -8,14 +8,16 @@ The SDK is alpha software. Additive response fields are compatible and are
 tolerated at runtime. Removing or renaming a public method, field, or stable
 `error.code` requires a deprecation cycle.
 
-Tyxter Python `0.8.0` is published on PyPI. Editing the version or these docs
-alone does not publish another package, create a tag, or change PyPI state;
-releases use the repository's Trusted Publishing workflow.
+The `0.12.0` source line is the release candidate for canonical `tyxter` 0.12.0,
+which npm publishes. PyPI serves `0.8.0` until the repository's Trusted
+Publishing workflow publishes this version. Editing the version or these docs
+alone does not publish another package, create a tag, or change PyPI state.
 
 ## Install
 
-Install the published SDK with `pip install tyxter`, or pin this release with
-`pip install tyxter==0.8.0`. To evaluate the current repository source instead,
+Install the published SDK with `pip install tyxter`, or pin the published
+release with `pip install tyxter==0.8.0`; neither includes the 0.12.0 candidate
+documented in this checkout. To evaluate the current repository source instead,
 install a checkout; doing so does not publish it:
 
 ```bash
@@ -717,7 +719,7 @@ that hits a route the manifest does not define fails, and a query parameter or
 `Idempotency-Key` mode (`unsupported`, `supported`, or `required`) that drifts
 from the contract fails.
 
-The current manifest at `e253e046739889d2bd2d32c4798e3864ba9f9290` classifies
+The current manifest at `a9142f6b52726629474fdc5c8afe21ff4687fb13` classifies
 all **206** rows: **198** have typed SDK routes, and **8** are reviewed
 exemptions. `PUT` and `GET /v1/media/blobs/:token` are capability-token routes:
 the signed token is their sole authority, so they are not bearer-authenticated
@@ -726,9 +728,9 @@ SDK routes. The other six are `GET` and `DELETE` under
 teaching-only refusals for a pasted personal WhatsApp invite link that the
 manifest itself declares have no SDK method; `groups.retrieve()` and
 `groups.delete()` percent-encode the id and reach the same `422`. The count is
-source-conformance evidence, not a publication claim. Both snapshots are
-byte-identical to those at canonical release head
-`9cec1d4b624e0f1381b195adda2241b81a15c069` (`tyxter` 0.12.0).
+source-conformance evidence, not a publication claim. That commit is the
+`sdk-js-v0.12.0` release tag; the snapshots are byte-identical to the
+`e253e046739889d2bd2d32c4798e3864ba9f9290` copies they replace.
 
 **Do not hand-edit these files to make a test pass.** They are generated in the
 Tyxter Messaging repo, where they are verified against the mounted `v1`

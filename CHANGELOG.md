@@ -3,8 +3,9 @@
 All notable changes to the Tyxter Python SDK are documented here. The format is
 based on Keep a Changelog, and versions follow Python packaging version rules.
 
-**Version line.** This package tracks the canonical
-[`@tyxter/sdk-js`](https://www.npmjs.com/package/@tyxter/sdk-js) version for API
+**Version line.** This package tracks the canonical JavaScript SDK version,
+published on npm as [`tyxter`](https://www.npmjs.com/package/tyxter) (formerly
+[`@tyxter/sdk-js`](https://www.npmjs.com/package/@tyxter/sdk-js)), for API
 and functional parity. That is why this package goes `0.1.0a0` → `0.8.0` rather
 than incrementing from its own history: it is adopting the canonical line, not
 claiming four releases of its own. Explicitly identified forward-compatible
@@ -13,15 +14,17 @@ published JavaScript tag in these notes.
 
 ## [Unreleased]
 
-**Pending: the prepared Python 0.12.0 entry.** It targets canonical `tyxter` 0.12.0 (published
-as `@tyxter/sdk-js` through 0.10.0), prepared on Tyxter Messaging branch `release/sdk-js-0.12.0`
-at `9cec1d4b624e0f1381b195adda2241b81a15c069`. That version is **not yet on npm**, so nothing
-below is published behavior. Once npm publishes 0.12.0 from that source, this heading becomes
-`## [0.12.0] - <date>` together with the version bump. The entry ports the canonical diff from
-`sdk-js-v0.8.0` (`58524926a1fa9498bcfe3abb9d7aa8fd39be1e85`) through `sdk-js-v0.9.0`,
-`sdk-js-v0.10.0`, `sdk-js-v0.11.0`, `sdk-js-v0.11.1` and 0.12.0. The vendored route and query
-snapshots (synced from `e253e046739889d2bd2d32c4798e3864ba9f9290`) are byte-identical to the
-target's.
+No unreleased changes.
+
+## [0.12.0] - 2026-11-06
+
+This Python release ports canonical `tyxter` 0.12.0, published on npm from Tyxter Messaging tag
+`sdk-js-v0.12.0` (`a9142f6b52726629474fdc5c8afe21ff4687fb13`); the canonical package was published
+as `@tyxter/sdk-js` through 0.10.0. It ports the canonical diff from `sdk-js-v0.8.0`
+(`58524926a1fa9498bcfe3abb9d7aa8fd39be1e85`) through `sdk-js-v0.9.0`, `sdk-js-v0.10.0`,
+`sdk-js-v0.11.0`, `sdk-js-v0.11.1` and `sdk-js-v0.12.0`, and closes the older gaps listed under
+Added and Fixed. `conformance/` now records the tag commit; its route and query snapshots are
+byte-identical to the previous `e253e046739889d2bd2d32c4798e3864ba9f9290` copies.
 
 Python conventions and the deliberate differences from canonical:
 
