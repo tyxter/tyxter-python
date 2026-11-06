@@ -14,6 +14,10 @@ class WebhookDeliveryAttempt(TypedDict):
     status: Literal["pending", "succeeded", "failed"]
     attempt: int
     status_code: int | None
+    # None on pending, successful, historical and unclassified attempts.
+    failure_class: NotRequired[
+        Literal["auth_rejected", "server_error", "unreachable", "timeout"] | None
+    ]
     response_body_redacted: str | None
     error_message: str | None
     next_retry_at: str | None
