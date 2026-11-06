@@ -11,7 +11,6 @@ from .messages import (
     InboundUnknownDescriptor,
     InboundUnsupportedDescriptor,
     MessageContext,
-    MessageProviderError,
 )
 
 WebhookEndpointStatus: TypeAlias = Literal["active", "disabled"]
@@ -317,10 +316,23 @@ GroupWebhookEventType: TypeAlias = Literal[
 ]
 
 
+class GroupWebhookProviderError(TypedDict, total=False):
+    """Meta's error detail on a group failure; Meta can omit any of these keys."""
+
+    message: str | None
+    type: str | None
+    code: int | str | None
+    error_subcode: int | str | None
+    error_data: object
+    fbtrace_id: str | None
+    error_user_title: str | None
+    error_user_msg: str | None
+
+
 class GroupWebhookFailure(TypedDict):
     code: str
     message: str
-    provider: MessageProviderError | None
+    provider: GroupWebhookProviderError | None
 
 
 class GroupWebhookData(TypedDict):

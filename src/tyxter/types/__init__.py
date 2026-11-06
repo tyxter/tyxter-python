@@ -506,6 +506,7 @@ from .sandbox import (
     InboundSandboxMessageRequest,
     SandboxAPIKey,
     SandboxCapabilities,
+    SandboxDefaultTemplate,
     SandboxEnvironment,
     SandboxInboundUnknownInput,
     SandboxInboundUnsupportedInput,
@@ -515,6 +516,7 @@ from .sandbox import (
     SandboxQuickstartResponse,
     SandboxSender,
     SandboxSigningHeaders,
+    SandboxTemplates,
     SandboxTemplateStatusRequest,
     SandboxWebhooks,
 )
@@ -538,6 +540,8 @@ from .templates import (
 )
 from .usage import (
     ConversationCategory,
+    EstimatedExternalMetaCost,
+    EstimatedExternalMetaCostSummary,
     ListUsageRecordsResponse,
     UsageGroupBy,
     UsageRecordResponse,
@@ -585,6 +589,7 @@ from .webhooks import (
     GroupWebhookEventType,
     GroupWebhookFailure,
     GroupWebhookParticipant,
+    GroupWebhookProviderError,
     GroupWebhookStatus,
     ListWebhookEndpointsResponse,
     MessageMediaTranscribedWebhookData,
@@ -1218,4 +1223,9 @@ __all__ = [
     "WebhookListenSessionActiveSession",
     "WebhookListenSessionConflictDetails",
     "WhatsAppGroupRecipientIdentity",
+    "EstimatedExternalMetaCost",
+    "EstimatedExternalMetaCostSummary",
+    "GroupWebhookProviderError",
+    "SandboxDefaultTemplate",
+    "SandboxTemplates",
 ]

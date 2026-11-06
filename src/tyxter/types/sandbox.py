@@ -87,6 +87,17 @@ class SandboxCapabilities(TypedDict):
     simulate_inbound: bool
     listen_for_webhooks: bool
     send_outbound_messages: bool
+    send_template_messages: NotRequired[bool]
+
+
+class SandboxDefaultTemplate(TypedDict):
+    name: str
+    language: str
+
+
+class SandboxTemplates(TypedDict):
+    approved_template_count: int
+    default_template: SandboxDefaultTemplate | None
 
 
 class SandboxQuickstartResponse(TypedDict):
@@ -95,6 +106,7 @@ class SandboxQuickstartResponse(TypedDict):
     api_key: SandboxAPIKey
     sender: SandboxSender
     webhooks: SandboxWebhooks
+    templates: NotRequired[SandboxTemplates]
     capabilities: SandboxCapabilities
     missing_scopes: list[str]
 

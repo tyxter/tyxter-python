@@ -20,6 +20,8 @@ from tyxter.types import (
     DisplayNameWarningCode,
     DuplicateTemplateRequest,
     ErrorDiscoveryPointer,
+    EstimatedExternalMetaCost,
+    EstimatedExternalMetaCostSummary,
     FlowRejectionCode,
     FlowResponse,
     GroupMessageReceivedWebhookEnvelope,
@@ -100,6 +102,7 @@ from tyxter.types import (
     PurchaseBillingPackageRequest,
     RequestMessageMediaTranscription,
     RotateWebhookSigningSecretResponse,
+    SandboxDefaultTemplate,
     SendMediaMessageInput,
     ServiceWindowRequiredDetails,
     ServiceWindowRequiredReason,
@@ -1043,3 +1046,18 @@ def parity_0_12_webhooks(
     assert_type(group_message["data"]["recipient"]["type"], Literal["whatsapp_group"])
     assert_type(reaction["data"]["reaction"]["from"], str | None)
     assert_type(hard_block["data"]["trigger"], CreditHardBlockTrigger)
+
+
+def pre_0_8_usage_and_quickstart_reads(client: Tyxter) -> None:
+    summary = client.usage.retrieve(period_start="2026-10-01", period_end="2026-11-01")
+    estimate = summary.get("estimated_external_meta_cost")
+    if estimate is not None:
+        assert_type(estimate, EstimatedExternalMetaCostSummary)
+    record = client.usage.list_records()["data"][0]
+    record_estimate = record.get("estimated_external_meta_cost")
+    if record_estimate is not None:
+        assert_type(record_estimate, EstimatedExternalMetaCost)
+    templates = client.sandbox.quickstart().get("templates")
+    if templates is not None:
+        assert_type(templates["default_template"], SandboxDefaultTemplate | None)
+    client.audiences.create({"name": "VIP"})
