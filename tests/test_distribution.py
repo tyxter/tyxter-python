@@ -55,7 +55,7 @@ def test_builds_complete_wheel_and_sdist(tmp_path: Path) -> None:
     } <= wheel_names
     assert any(name.endswith(".dist-info/METADATA") for name in wheel_names)
     assert any(name.endswith(".dist-info/licenses/LICENSE") for name in wheel_names)
-    assert "Version: 0.12.0" in metadata.splitlines()
+    assert "Version: 0.12.0.post1" in metadata.splitlines()
     assert "Requires-Python: >=3.10" in metadata
     assert "Requires-Dist: typing-extensions" in metadata
 

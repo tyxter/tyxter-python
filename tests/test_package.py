@@ -22,7 +22,7 @@ def test_package_exports_client_and_version() -> None:
 
 
 def test_package_source_version_tracks_the_shared_0_12_line() -> None:
-    assert __version__ == "0.12.0"
+    assert __version__ == "0.12.0.post1"
 
 
 def test_both_client_user_agent_paths_derive_from_the_candidate_version() -> None:
@@ -44,7 +44,7 @@ def test_both_client_user_agent_paths_derive_from_the_candidate_version() -> Non
                 trace_id=None,
                 has_body=False,
             )["User-Agent"]
-            == "tyxter-python/0.12.0"
+            == "tyxter-python/0.12.0.post1"
         )
         bootstrap._request(
             "POST",
@@ -56,7 +56,7 @@ def test_both_client_user_agent_paths_derive_from_the_candidate_version() -> Non
         client.close()
         bootstrap.close()
 
-    assert seen[0].headers["user-agent"] == "tyxter-python/0.12.0"
+    assert seen[0].headers["user-agent"] == "tyxter-python/0.12.0.post1"
 
 
 def test_client_requires_api_key() -> None:

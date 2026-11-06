@@ -39,7 +39,9 @@ At the start of SDK or release work:
    public methods, options, request/response fields, exported types, errors, webhook contracts,
    headers, query parameters, and documentation changes—not just new routes.
 
-A Python version means full parity with that canonical version. If complete parity is blocked, keep
+A Python version means full parity with that canonical version. A documentation- or metadata-only
+re-upload of a released version uses a PEP 440 post-release (`X.Y.Z.postN`) with no code change
+(owner, 2026-11-06). If complete parity is blocked, keep
 the work unreleased and report the precise gap. Canonical changes that have not shipped on npm may
 be prepared only as clearly labelled `Unreleased` work; never describe them as published behavior.
 
