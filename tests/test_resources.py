@@ -395,18 +395,30 @@ def test_messages_retry_transcription_requires_and_trims_idempotency_key() -> No
     assert seen[0].headers["tyxter-trace-id"] == "trc_retry"
 
 
+# Every route whose manifest mode is `required` and whose key the caller must
+# supply (the SDK never generates one for these).
+CALLER_REQUIRED_KEY_CALLS: dict[str, Callable[[Tyxter, str], object]] = {
+    "messages.retry_transcription": lambda client, key: client.messages.retry_transcription(
+        "msg_123", {"language": "pt"}, idempotency_key=key
+    ),
+    "meta_signup_sessions.create": lambda client, key: client.meta_signup_sessions.create(
+        {"return_url": "https://merchant.example/meta/callback"}, idempotency_key=key
+    ),
+}
+
+
 @pytest.mark.parametrize("idempotency_key", ["", " \t "])
-def test_messages_retry_transcription_rejects_blank_keys_before_network_io(
+@pytest.mark.parametrize(
+    "call", CALLER_REQUIRED_KEY_CALLS.values(), ids=CALLER_REQUIRED_KEY_CALLS.keys()
+)
+def test_caller_required_idempotency_keys_reject_blank_values_before_network_io(
+    call: Callable[[Tyxter, str], object],
     idempotency_key: str,
 ) -> None:
     client, seen = make_client()
 
     with pytest.raises(ValueError, match="idempotency_key must be a non-blank string"):
-        client.messages.retry_transcription(
-            "msg_123",
-            {"language": "pt"},
-            idempotency_key=idempotency_key,
-        )
+        call(client, idempotency_key)
 
     assert seen == []
 

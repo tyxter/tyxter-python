@@ -46,6 +46,7 @@ class SandboxTemplatesResource(Resource):
         template_id: str,
         payload: SandboxTemplateStatusRequest,
         *,
+        idempotency_key: str | None = None,
         trace_id: str | None = None,
     ) -> TemplateResponse:
         return cast(
@@ -54,6 +55,7 @@ class SandboxTemplatesResource(Resource):
                 "POST",
                 f"/v1/sandbox/templates/{path_id('template_id', template_id)}/status",
                 json=payload,
+                idempotency_key=idempotency_key,
                 trace_id=trace_id,
             ),
         )

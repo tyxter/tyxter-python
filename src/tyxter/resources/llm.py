@@ -32,7 +32,11 @@ class LLMRoutesResource(Resource):
         )
 
     def update(
-        self, payload: UpdateLLMRouteRequest, *, phone_number_id: str | None = None
+        self,
+        payload: UpdateLLMRouteRequest,
+        *,
+        phone_number_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> LLMRouteResponse:
         return cast(
             LLMRouteResponse,
@@ -41,6 +45,7 @@ class LLMRoutesResource(Resource):
                 "/v1/llm-routes",
                 json=payload,
                 params={"phone_number_id": phone_number_id},
+                idempotency_key=idempotency_key,
             ),
         )
 
