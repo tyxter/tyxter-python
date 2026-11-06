@@ -536,14 +536,10 @@ def test_provider_connections_and_credential_setup_match_header_capabilities() -
     client.provider_connections.list(limit=5, starting_after="pc_1")
     client.provider_connections.status()
     client.provider_connections.meta_onboarding()
-    client.provider_connections.register_meta(
-        {"display_name": "Meta", "access_token": "token", "channel": "whatsapp"}
-    )
     client.provider_connections.exchange_meta_oauth(
         {"code": "code", "signup_session_id": "signup_123"}
     )
     client.provider_connections.retrieve("pc/2")
-    client.provider_connections.rotate_token("pc/2", {"access_token": "new"})
     client.provider_connections.delete("pc/2")
     client.provider_credential_setup_sessions.create(
         {"target": "meta.whatsapp"}, idempotency_key="idem_setup"
@@ -554,19 +550,17 @@ def test_provider_connections_and_credential_setup_match_header_capabilities() -
     assert seen[0].url.query.decode() == "limit=5&starting_after=pc_1"
     assert seen[1].url.path.endswith("/status")
     assert seen[2].url.path.endswith("/meta/onboarding")
-    assert body(seen[3])["access_token"] == "token"
-    assert body(seen[4]) == {"code": "code", "signup_session_id": "signup_123"}
-    assert all("idempotency-key" not in request.headers for request in seen[:8])
-    assert str(seen[5].url) == "https://api.test/v1/provider-connections/pc%2F2"
-    assert body(seen[6]) == {"access_token": "new"}
-    assert seen[7].method == "DELETE"
-    assert seen[8].headers["idempotency-key"] == "idem_setup"
-    assert str(seen[9].url) == ("https://api.test/v1/provider-credential-setup-sessions/req%2F1")
-    assert seen[10].method == "POST"
-    assert str(seen[10].url) == (
+    assert body(seen[3]) == {"code": "code", "signup_session_id": "signup_123"}
+    assert all("idempotency-key" not in request.headers for request in seen[:6])
+    assert str(seen[4].url) == "https://api.test/v1/provider-connections/pc%2F2"
+    assert seen[5].method == "DELETE"
+    assert seen[6].headers["idempotency-key"] == "idem_setup"
+    assert str(seen[7].url) == ("https://api.test/v1/provider-credential-setup-sessions/req%2F1")
+    assert seen[8].method == "POST"
+    assert str(seen[8].url) == (
         "https://api.test/v1/provider-connections/pc%2F2/meta/complete-registration"
     )
-    assert seen[10].headers["idempotency-key"] == "idem_complete"
+    assert seen[8].headers["idempotency-key"] == "idem_complete"
 
 
 def test_provider_connection_availability_reads_preserve_advisory_observations() -> None:

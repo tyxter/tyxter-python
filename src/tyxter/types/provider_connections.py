@@ -59,18 +59,6 @@ class AgenticPaymentProviderCapabilities(TypedDict):
     polling: bool
 
 
-class RegisterMetaConnectionRequest(TypedDict):
-    display_name: str
-    access_token: str
-    channel: NotRequired[ProviderConnectionChannel]
-    waba_id: NotRequired[str]
-    phone_number_id: NotRequired[str]
-    ig_business_account_id: NotRequired[str]
-    page_id: NotRequired[str]
-    token_source: NotRequired[ProviderTokenSource]
-    token_expires_at: NotRequired[str | None]
-
-
 class ExchangeMetaOAuthCodeRequest(TypedDict, total=False):
     code: Required[str]
     waba_id: NotRequired[str]
@@ -78,12 +66,6 @@ class ExchangeMetaOAuthCodeRequest(TypedDict, total=False):
     display_name: NotRequired[str]
     business_id: NotRequired[str]
     signup_session_id: NotRequired[str]
-
-
-class RotateProviderConnectionTokenRequest(TypedDict):
-    access_token: str
-    token_source: NotRequired[ProviderTokenSource]
-    token_expires_at: NotRequired[str | None]
 
 
 class ProviderConnectionRestriction(TypedDict):
@@ -205,7 +187,6 @@ class MetaOnboardingConfigResponse(TypedDict):
     message_type: Literal["WA_EMBEDDED_SIGNUP"]
     login_options: MetaOnboardingLoginOptions
     completion_endpoint: Literal["/v1/provider-connections/meta/oauth"]
-    manual_credentials_endpoint: Literal["/v1/provider-connections/meta"]
 
 
 class CreateProviderCredentialSetupSessionRequest(TypedDict):

@@ -368,8 +368,6 @@ from .provider_connections import (
     ProviderName,
     ProviderReadinessStatus,
     ProviderTokenSource,
-    RegisterMetaConnectionRequest,
-    RotateProviderConnectionTokenRequest,
 )
 from .sandbox import (
     InboundSandboxMessageRequest,
@@ -788,10 +786,8 @@ __all__ = [
     "RotateWebhookSigningSecretResponse",
     "RequestPaymentApprovalRequest",
     "RequestMessageMediaTranscription",
-    "RegisterMetaConnectionRequest",
     "RenameApiKeyRequest",
     "RotateApiKeyResponse",
-    "RotateProviderConnectionTokenRequest",
     "SandboxAPIKey",
     "SandboxCapabilities",
     "SandboxEnvironment",
