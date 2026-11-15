@@ -5,6 +5,7 @@ from typing import Literal, cast
 
 from .types import (
     ErrorFeedbackPointer,
+    MetaPhoneNumberAlreadyConnectedDetails,
     PhoneNumberRentalApprovalOrder,
     ServiceWindowRequiredDetails,
     TyxterErrorType,
@@ -53,6 +54,8 @@ class TyxterAPIError(TyxterError):
     - ``rental_order`` is the order a ``phone_number_rental_approval_required`` refusal created.
     - ``service_window`` is the evidence of a ``service_window_required`` refusal, when the
       server supplied a well-formed variant.
+    - ``connected_phone_holder`` is the same-organization holder on
+      ``meta_phone_number_already_connected``, when the server supplied three string ids.
     """
 
     def __init__(
@@ -74,6 +77,7 @@ class TyxterAPIError(TyxterError):
         next_allowed_at: str | None = None,
         rental_order: PhoneNumberRentalApprovalOrder | None = None,
         service_window: ServiceWindowRequiredDetails | None = None,
+        connected_phone_holder: MetaPhoneNumberAlreadyConnectedDetails | None = None,
         raw_body: TyxterWireErrorBody | None = None,
     ) -> None:
         super().__init__(message)
@@ -93,6 +97,7 @@ class TyxterAPIError(TyxterError):
         self.next_allowed_at = next_allowed_at
         self.rental_order = rental_order
         self.service_window = service_window
+        self.connected_phone_holder = connected_phone_holder
         self.raw_body = raw_body
 
 
@@ -134,6 +139,7 @@ def parse_api_error(status_code: int, body: object) -> TyxterAPIError:
             next_allowed_at=_string_value(details.get("next_allowed_at")) if details else None,
             rental_order=_rental_order(code, details),
             service_window=_service_window(code, details),
+            connected_phone_holder=_connected_phone_holder(code, details),
             raw_body=cast(TyxterWireErrorBody, error),
         )
 
@@ -181,6 +187,19 @@ def _rental_order(
     if not isinstance(order, Mapping):
         return None
     return cast(PhoneNumberRentalApprovalOrder, order)
+
+
+def _connected_phone_holder(
+    code: str, details: Mapping[object, object] | None
+) -> MetaPhoneNumberAlreadyConnectedDetails | None:
+    if code != "meta_phone_number_already_connected" or details is None:
+        return None
+    if not all(
+        isinstance(details.get(name), str)
+        for name in ("project_id", "environment_id", "provider_connection_id")
+    ):
+        return None
+    return cast(MetaPhoneNumberAlreadyConnectedDetails, details)
 
 
 def _service_window(

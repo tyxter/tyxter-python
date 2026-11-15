@@ -176,6 +176,7 @@ from .errors import (
     CreditBalanceExhaustedReachableRoute,
     ErrorDiscoveryPointer,
     ErrorFeedbackPointer,
+    MetaPhoneNumberAlreadyConnectedDetails,
     PhoneNumberRentalApprovalOrder,
     PhoneNumberRentalApprovalRequiredDetails,
     RecipientGuardDetails,
@@ -415,6 +416,7 @@ from .phone_numbers import (
     ListPhoneNumbersResponse,
     MetaThroughputTier,
     PhoneMessagingTier,
+    PhoneNumberMetaConnectionLinkResponse,
     PhoneNumberMutationResponse,
     PhoneNumberNameReviewResponse,
     PhoneNumberOrderFailure,
@@ -473,6 +475,7 @@ from .provider_connections import (
     ProviderConnectionOperation,
     ProviderConnectionOperationErrorCode,
     ProviderConnectionOperationKind,
+    ProviderConnectionPhoneNumberLink,
     ProviderConnectionResponse,
     ProviderConnectionRestriction,
     ProviderConnectionSendBlockCode,
@@ -641,6 +644,9 @@ from .webhooks import (
 )
 
 __all__ = [
+    "MetaPhoneNumberAlreadyConnectedDetails",
+    "PhoneNumberMetaConnectionLinkResponse",
+    "ProviderConnectionPhoneNumberLink",
     "AbacatePayProviderOptions",
     "AgenticPaymentProviderCapabilities",
     "AgenticAuthorizationResponse",

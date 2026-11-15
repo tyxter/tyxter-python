@@ -326,7 +326,7 @@ def a5_phone_name_review_usage(client: Tyxter) -> None:
     assert_type(review["reason"], str | None)
 
     phone = client.phone_numbers.retrieve("pn_123")
-    assert_type(phone, PhoneNumberResponse)
+    assert_type(phone, PhoneNumberReadResponse)
     if "verified_name" in phone:
         assert_type(phone["verified_name"], str | None)
     if "pending_name_review" in phone:

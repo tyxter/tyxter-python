@@ -406,6 +406,15 @@ these API values; they do not trigger a live Meta fetch.
 
 ## Provider availability observations
 
+Unreleased recovery types mirror canonical surfaces not yet published on npm. Connection
+list/retrieve responses can include `phone_number_link` (`ProviderConnectionPhoneNumberLink`),
+with states `linked`, `unlinked`, `rented_elsewhere`, `connected_elsewhere` or `missing`.
+Phone list/retrieve responses can include `meta_connection_link`
+(`PhoneNumberMetaConnectionLinkResponse`), with states `linked`, `unlinked`,
+`connected_elsewhere` or `none`. Both fields are optional and nullable; writes and stored replays
+omit them. These are live same-organization relations, not send-readiness guarantees.
+`unlinked` does not promise that link repair will succeed. Import the types from `tyxter.types`.
+
 Provider connection availability fields are advisory evidence, not SDK send enforcement. An absent
 or null `send_capability` means there is no trusted observation: it is unknown and establishes
 neither availability nor unavailability. A `blocked` value does not change the connection status or
@@ -568,6 +577,11 @@ Typed views of `error.details`:
   `last_inbound_at`) on `service_window_required`, when the server supplied it.
 - `rental_order` is the order a `phone_number_rental_approval_required` refusal
   created.
+- Unreleased: `connected_phone_holder` is `MetaPhoneNumberAlreadyConnectedDetails` on
+  `meta_phone_number_already_connected` when supplied with three string ids (`project_id`,
+  `environment_id`, `provider_connection_id`). It is `None` for absent, malformed or wrong-code
+  details. It describes a same-organization holder; cross-organization and promoting-write race
+  refusals omit it, and asynchronous operation failures remain code-only.
 - `next_allowed_at` and `guard_reason` come from recipient-guard refusals such as
   `recipient_duplicate_message`. `next_allowed_at` is `None` both when absent and
   while an earlier send is pending; `raw_body["details"]` tells them apart.

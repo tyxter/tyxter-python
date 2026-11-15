@@ -14,7 +14,18 @@ published JavaScript tag in these notes.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+- Prepare the canonical rented-number recovery surfaces that are not yet published on npm:
+  `ProviderConnectionResponse.phone_number_link` (`ProviderConnectionPhoneNumberLink`) and
+  `PhoneNumberReadResponse.meta_connection_link` (`PhoneNumberMetaConnectionLinkResponse`). Both
+  fields are optional and nullable. They describe live same-organization relations on list/retrieve
+  reads; writes and stored replays omit them. `unlinked` does not promise successful link repair.
+- Export `MetaPhoneNumberAlreadyConnectedDetails` and add
+  `TyxterAPIError.connected_phone_holder`: the same-organization holder's three string ids when
+  supplied on `meta_phone_number_already_connected`. Absent, malformed or wrong-code details leave
+  the view `None`; the raw response is preserved. These are Unreleased preparations for the
+  canonical SDK surfaces, with no version or publication change.
 
 ## [0.12.0.post1] - 2026-11-06
 

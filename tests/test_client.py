@@ -325,6 +325,27 @@ _ACTIVE_SESSION = {
     "expires_at": "2026-05-29T13:05:00.000Z",
     "created_at": "2026-05-29T13:00:00.000Z",
 }
+_CONNECTED_PHONE_HOLDER = {
+    "project_id": "prj_holder",
+    "environment_id": "env_holder",
+    "provider_connection_id": "pc_holder",
+}
+_INVALID_HOLDER_ID_VALUES: tuple[object, ...] = (None, 123, [])
+_MALFORMED_CONNECTED_PHONE_HOLDERS: tuple[object, ...] = (
+    None,
+    [],
+    "malformed",
+    {"next_allowed_at": None},
+    *[
+        {name: value for name, value in _CONNECTED_PHONE_HOLDER.items() if name != missing}
+        for missing in _CONNECTED_PHONE_HOLDER
+    ],
+    *[
+        {**_CONNECTED_PHONE_HOLDER, name: value}
+        for name in _CONNECTED_PHONE_HOLDER
+        for value in _INVALID_HOLDER_ID_VALUES
+    ],
+)
 _NO_VIEWS: dict[str, object] = {
     "retryable": None,
     "details": None,
@@ -332,6 +353,7 @@ _NO_VIEWS: dict[str, object] = {
     "next_allowed_at": None,
     "rental_order": None,
     "service_window": None,
+    "connected_phone_holder": None,
 }
 
 
@@ -349,6 +371,40 @@ _NO_VIEWS: dict[str, object] = {
             {"reason": "window_expired", "last_inbound_at": "2026-10-25T12:00:00.000-03:00"},
             {"reason": "recipient_ambiguous", "last_inbound_at": None},
         )
+    ]
+    + [
+        pytest.param(
+            409,
+            {"code": "meta_phone_number_already_connected", "details": holder},
+            {"connected_phone_holder": holder},
+            id=f"connected-phone-holder-{index}",
+        )
+        for index, holder in enumerate(
+            (_CONNECTED_PHONE_HOLDER, {**_CONNECTED_PHONE_HOLDER, "future_field": "kept"})
+        )
+    ]
+    + [
+        pytest.param(
+            409,
+            {"code": "phone_number_conflict", "details": _CONNECTED_PHONE_HOLDER},
+            {},
+            id="connected-phone-holder-wrong-code",
+        ),
+        pytest.param(
+            409,
+            {"code": "meta_phone_number_already_connected"},
+            {},
+            id="connected-phone-holder-absent-details",
+        ),
+    ]
+    + [
+        pytest.param(
+            409,
+            {"code": "meta_phone_number_already_connected", "details": details},
+            {},
+            id=f"malformed-connected-phone-holder-{index}",
+        )
+        for index, details in enumerate(_MALFORMED_CONNECTED_PHONE_HOLDERS)
     ]
     + [
         pytest.param(

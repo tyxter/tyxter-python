@@ -667,3 +667,144 @@ client.billing.retrieve_phone_renewal("phr_1")
         "tyxter.resources.billing.BillingResource.list_phone_renewals",
         "tyxter.resources.billing.BillingResource.retrieve_phone_renewal",
     }, output
+
+
+def test_rented_number_recovery_public_typing_contracts(tmp_path: Path) -> None:
+    imports = """\
+from tyxter import Tyxter, TyxterAPIError
+from tyxter.types import (
+    MetaPhoneNumberAlreadyConnectedDetails,
+    PhoneNumberMetaConnectionLinkResponse,
+    PhoneNumberMutationResponse,
+    PhoneNumberReadResponse,
+    PhoneNumberResponse,
+    ProviderConnectionPhoneNumberLink,
+    ProviderConnectionResponse,
+    TyxterWireErrorDetails,
+)
+from typing_extensions import assert_type
+"""
+    positive = tmp_path / "valid_recovery_types.py"
+    positive.write_text(
+        imports
+        + """\
+
+phone_links: list[PhoneNumberMetaConnectionLinkResponse] = [
+    {"state": "linked", "project_id": None, "environment_id": None,
+     "provider_connection_id": "pc_local"},
+    {"state": "unlinked", "project_id": None, "environment_id": None,
+     "provider_connection_id": "pc_candidate"},
+    {"state": "connected_elsewhere", "project_id": "prj_holder", "environment_id": "env_holder",
+     "provider_connection_id": "pc_holder"},
+    {"state": "none", "project_id": None, "environment_id": None,
+     "provider_connection_id": None},
+]
+connection_links: list[ProviderConnectionPhoneNumberLink] = [
+    {"state": "linked", "phone_number_id": "pn_local", "project_id": None,
+     "environment_id": None, "provider_connection_id": None},
+    {"state": "unlinked", "phone_number_id": "pn_candidate", "project_id": None,
+     "environment_id": None, "provider_connection_id": None},
+    {"state": "rented_elsewhere", "phone_number_id": "pn_rented", "project_id": "prj_rented",
+     "environment_id": "env_rented", "provider_connection_id": None},
+    {"state": "connected_elsewhere", "phone_number_id": None, "project_id": "prj_holder",
+     "environment_id": "env_holder", "provider_connection_id": "pc_holder"},
+    {"state": "missing", "phone_number_id": None, "project_id": None,
+     "environment_id": None, "provider_connection_id": None},
+]
+holder: MetaPhoneNumberAlreadyConnectedDetails = {
+    "project_id": "prj_holder", "environment_id": "env_holder",
+    "provider_connection_id": "pc_holder",
+}
+wire_details: TyxterWireErrorDetails = holder
+
+def use_recovery(client: Tyxter, legacy: PhoneNumberReadResponse,
+                 connection: ProviderConnectionResponse, error: TyxterAPIError) -> None:
+    legacy.pop("meta_connection_link", None)
+    legacy["meta_connection_link"] = None
+    legacy["meta_connection_link"] = phone_links[0]
+    connection.pop("phone_number_link", None)
+    connection["phone_number_link"] = None
+    connection["phone_number_link"] = connection_links[0]
+    assert_type(client.phone_numbers.retrieve("pn_1").get("meta_connection_link"),
+                PhoneNumberMetaConnectionLinkResponse | None)
+    assert_type(client.phone_numbers.list()["data"][0].get("meta_connection_link"),
+                PhoneNumberMetaConnectionLinkResponse | None)
+    assert_type(client.provider_connections.retrieve("pc_1").get("phone_number_link"),
+                ProviderConnectionPhoneNumberLink | None)
+    assert_type(client.provider_connections.list()["data"][0].get("phone_number_link"),
+                ProviderConnectionPhoneNumberLink | None)
+    assert_type(error.connected_phone_holder, MetaPhoneNumberAlreadyConnectedDetails | None)
+    if error.connected_phone_holder is not None:
+        assert_type(error.connected_phone_holder["project_id"], str)
+""",
+        encoding="utf-8",
+    )
+    negative = tmp_path / "invalid_recovery_types.py"
+    negative.write_text(
+        imports
+        + """\
+
+phone_state: PhoneNumberMetaConnectionLinkResponse = {
+    "state": "missing", "project_id": None, "environment_id": None, "provider_connection_id": None,
+}
+connection_state: ProviderConnectionPhoneNumberLink = {
+    "state": "none", "phone_number_id": None, "project_id": None, "environment_id": None,
+    "provider_connection_id": None,
+}
+missing_id: PhoneNumberMetaConnectionLinkResponse = {
+    "state": "none", "project_id": None, "environment_id": None,
+}
+missing_phone_id: ProviderConnectionPhoneNumberLink = {
+    "state": "missing", "project_id": None, "environment_id": None, "provider_connection_id": None,
+}
+nullable_holder: MetaPhoneNumberAlreadyConnectedDetails = {
+    "project_id": None, "environment_id": "env_holder", "provider_connection_id": "pc_holder",
+}
+missing_holder_id: MetaPhoneNumberAlreadyConnectedDetails = {
+    "project_id": "prj_holder", "environment_id": "env_holder",
+}
+extra_holder_id: MetaPhoneNumberAlreadyConnectedDetails = {
+    "project_id": "prj_holder", "environment_id": "env_holder",
+    "provider_connection_id": "pc_holder",
+    "organization_id": "org_1",
+}
+
+def invalid_response_fields(base: PhoneNumberResponse, mutation: PhoneNumberMutationResponse,
+                            read: PhoneNumberReadResponse) -> None:
+    base["meta_connection_link"] = None
+    mutation["meta_connection_link"] = None
+    read["meta_connection_link"] = {"state": "none", "project_id": 123,
+                                    "environment_id": None, "provider_connection_id": None}
+""",
+        encoding="utf-8",
+    )
+    environment = os.environ.copy()
+    source_path = str(PACKAGE_ROOT / "src")
+    environment["MYPYPATH"] = os.pathsep.join(
+        part for part in (source_path, environment.get("MYPYPATH", "")) if part
+    )
+    for fixture, valid in ((positive, True), (negative, False)):
+        result = subprocess.run(
+            [sys.executable, "-m", "mypy", "--strict", str(fixture)],
+            cwd=PACKAGE_ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        output = result.stdout + result.stderr
+        if valid:
+            assert result.returncode == 0, output
+        else:
+            assert result.returncode != 0, output
+            for diagnostic in (
+                'TypedDict item "state"',
+                'Missing key "provider_connection_id"',
+                'Missing key "phone_number_id"',
+                'TypedDict item "project_id"',
+                'Extra key "organization_id"',
+                'TypedDict "PhoneNumberResponse" has no key "meta_connection_link"',
+                'TypedDict "PhoneNumberMutationResponse" has no key "meta_connection_link"',
+            ):
+                assert diagnostic in output, output
+            assert output.count("error:") == 10, output

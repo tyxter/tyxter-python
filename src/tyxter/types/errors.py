@@ -70,6 +70,14 @@ ServiceWindowRequiredReason: TypeAlias = Literal[
 ]
 
 
+class MetaPhoneNumberAlreadyConnectedDetails(TypedDict):
+    """Same-organization holder details for ``meta_phone_number_already_connected``."""
+
+    project_id: str
+    environment_id: str
+    provider_connection_id: str
+
+
 class ServiceWindowRequiredDetails(TypedDict):
     """Bounded evidence for a ``service_window_required`` refusal."""
 
@@ -108,6 +116,7 @@ TyxterWireErrorDetails: TypeAlias = (
     CreditBalanceExhaustedDetails
     | WebhookListenSessionConflictDetails
     | PhoneNumberRentalApprovalRequiredDetails
+    | MetaPhoneNumberAlreadyConnectedDetails
     | ServiceWindowRequiredDetails
     | RecipientGuardDetails
 )

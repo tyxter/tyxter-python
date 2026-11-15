@@ -4,6 +4,7 @@ import json
 from typing import cast
 
 import httpx
+import pytest
 
 from tyxter import Tyxter
 from tyxter.types import (
@@ -420,6 +421,59 @@ def test_phone_numbers_cover_lifecycle_and_escape_ids() -> None:
     assert str(seen[4].url) == "https://api.test/v1/phone-numbers/pn%2F1"
     assert not seen[5].content
     assert seen[7].method == "DELETE"
+
+
+@pytest.mark.parametrize(
+    ("phone_fields", "connection_fields"),
+    [
+        ({}, {}),
+        ({"meta_connection_link": None}, {"phone_number_link": None}),
+        (
+            {
+                "meta_connection_link": {
+                    "state": "connected_elsewhere",
+                    "project_id": "prj_holder",
+                    "environment_id": "env_holder",
+                    "provider_connection_id": "pc_holder",
+                }
+            },
+            {
+                "phone_number_link": {
+                    "state": "rented_elsewhere",
+                    "phone_number_id": "pn_rented",
+                    "project_id": "prj_rented",
+                    "environment_id": "env_rented",
+                    "provider_connection_id": None,
+                }
+            },
+        ),
+    ],
+    ids=["omitted", "null", "elsewhere"],
+)
+def test_recovery_link_reads_preserve_optional_wire_fields(
+    phone_fields: dict[str, object], connection_fields: dict[str, object]
+) -> None:
+    phone = phone_response(**phone_fields)
+    connection = provider_connection_response(**connection_fields)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        resource = phone if "/phone-numbers" in request.url.path else connection
+        if request.url.path in ("/v1/phone-numbers", "/v1/provider-connections"):
+            return httpx.Response(
+                200,
+                json={"object": "list", "data": [resource], "has_more": False, "next_cursor": None},
+            )
+        return httpx.Response(200, json=resource)
+
+    client = Tyxter(
+        api_key="tx_sandbox_test",
+        base_url="https://api.test",
+        transport=httpx.MockTransport(handler),
+    )
+    assert client.phone_numbers.list()["data"][0] == phone
+    assert client.phone_numbers.retrieve("pn_123") == phone
+    assert client.provider_connections.list()["data"][0] == connection
+    assert client.provider_connections.retrieve("pc_123") == connection
 
 
 def test_phone_name_review_reads_preserve_future_meta_values() -> None:

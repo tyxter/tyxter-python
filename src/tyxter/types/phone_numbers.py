@@ -231,6 +231,13 @@ class PhoneNumberResponse(TypedDict):
     recent_messages: list[PhoneNumberRecentMessageResponse]
 
 
+class PhoneNumberMetaConnectionLinkResponse(TypedDict):
+    state: Literal["linked", "unlinked", "connected_elsewhere", "none"]
+    project_id: str | None
+    environment_id: str | None
+    provider_connection_id: str | None
+
+
 class PhoneNumberReadResponse(PhoneNumberResponse):
     """A phone number as `phone_numbers.list()` and `phone_numbers.retrieve()` return it.
 
@@ -239,6 +246,9 @@ class PhoneNumberReadResponse(PhoneNumberResponse):
     required without breaking existing `PhoneNumberResponse` annotations, so the type keeps it
     optional.
     """
+
+    # Live relation on list/retrieve reads; absent/null is compatible with older responses.
+    meta_connection_link: NotRequired[PhoneNumberMetaConnectionLinkResponse | None]
 
 
 class PhoneNumberMutationResponse(PhoneNumberResponse):

@@ -192,6 +192,14 @@ class ProviderConnectionWabaSendCapability(TypedDict):
     observed_at: str
 
 
+class ProviderConnectionPhoneNumberLink(TypedDict):
+    state: Literal["linked", "unlinked", "rented_elsewhere", "connected_elsewhere", "missing"]
+    phone_number_id: str | None
+    project_id: str | None
+    environment_id: str | None
+    provider_connection_id: str | None
+
+
 class ProviderConnectionResponse(TypedDict):
     id: str
     object: Literal["provider_connection"]
@@ -203,6 +211,8 @@ class ProviderConnectionResponse(TypedDict):
     waba_id: str | None
     phone_number_id: str | None
     display_phone_number: NotRequired[str | None]
+    # Derived on list/retrieve reads; writes and stored replays omit it.
+    phone_number_link: NotRequired[ProviderConnectionPhoneNumberLink | None]
     ig_business_account_id: str | None
     page_id: str | None
     provider_account_id: str | None
