@@ -38,7 +38,6 @@
     "status"
   ],
   "ListPaymentsQuery": ["limit", "starting_after", "status"],
-  "ListPhoneManagementQuery": ["limit", "starting_after"],
   "ListPhoneNumbersQuery": ["limit", "starting_after", "status"],
   "ListPhoneRenewalsQuery": ["limit", "starting_after", "status"],
   "ListProjectsQuery": ["limit", "starting_after"],

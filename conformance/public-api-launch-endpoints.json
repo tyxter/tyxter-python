@@ -381,7 +381,7 @@
     "response_schema": "ListenWebhookEventsResponse",
     "idempotency_key": "none",
     "trace_id_header": "none",
-    "notes": "Sandbox keys can listen directly. Production reads use the owning API key's short-lived listen_session_id from POST /v1/webhook-events/listen-sessions and include only events with created_at >= session.created_at and < session.expires_at. Optional start_at=tail starts after the current retained stream. Optional webhook_endpoint_id filters to that endpoint subscription and attaches a signature_preview for verifier probes."
+    "notes": "Pull feed of customer-visible webhook events for sandbox and production keys; production needs no listen session. A cursor read is bounded by its cursor and by event retention (about 30 days; financial and fiscal event types longer), never by a listen session, and events are served in stream order: an event from a transaction still open is delayed until it commits, never skipped. Without a cursor, production starts at the current tail and start_at=oldest replays the retained window; a passed listen_session_id moves an omitted or oldest start to the session created_at. Sandbox starts at oldest, and start_at=tail always starts at the tail. Send next_cursor back as cursor: it is never null after a cursor read. listen_session_id is deprecated; a session a production key passes is validated and caps the long poll at its expires_at, and sandbox keys ignore it. Optional webhook_endpoint_id filters to that endpoint subscription from the endpoint creation time on and attaches a signature_preview for verifier probes."
   },
   {
     "resource": "webhook_events",
@@ -394,7 +394,8 @@
     "response_schema": "WebhookListenSessionResponse",
     "idempotency_key": "supported",
     "trace_id_header": "none",
-    "notes": "Production keys only. Creates one short-lived diagnostic listen session so production polling cannot become a long-running webhook transport. An active-session conflict is free and requires error.details.active_session.{id, expires_at, created_at}; only the owning API key may reuse and poll that id outside grace or renew with 30 seconds or less remaining. Renewal atomically disables the old session id, and the owner must switch polling to the returned 201 session id. A sibling must not poll it or loop POST, and waits until expires_at or coordinates with the owner to disable."
+    "deprecated": true,
+    "notes": "Deprecated: poll GET /v1/webhook-events/listen without a session and send next_cursor back as cursor instead. Production keys only. Creates one short-lived listen session; a passed session bounds only where a cursor-less first listen read starts and caps the long poll at its expires_at. An active-session conflict is free and requires error.details.active_session.{id, expires_at, created_at}; only the owning API key may reuse and poll that id outside grace or renew with 30 seconds or less remaining. Renewal atomically disables the old session id, and the owner must switch polling to the returned 201 session id. A sibling must not poll it or loop POST, and waits until expires_at or coordinates with the owner to disable."
   },
   {
     "resource": "webhook_events",
@@ -407,7 +408,8 @@
     "response_schema": "WebhookListenSessionResponse",
     "idempotency_key": "none",
     "trace_id_header": "none",
-    "notes": "Disables a production webhook listen session before its automatic expiry."
+    "deprecated": true,
+    "notes": "Deprecated: stop passing listen_session_id to GET /v1/webhook-events/listen instead. Disables a production webhook listen session before its automatic expiry."
   },
   {
     "resource": "webhook_events",
@@ -420,7 +422,7 @@
     "response_schema": "WebhookEventLogResponse",
     "idempotency_key": "none",
     "trace_id_header": "none",
-    "notes": "Sandbox keys can retrieve directly. Production keys must pass the owning API key's active listen_session_id and can retrieve only an event with created_at >= session.created_at and < session.expires_at. Optional webhook_endpoint_id attaches a signature_preview for verifier probes."
+    "notes": "Sandbox and production keys retrieve directly any event still retained (about 30 days; financial and fiscal event types longer). listen_session_id is deprecated; a session a production key passes is validated and does not limit which event can be retrieved, and sandbox keys ignore it. Optional webhook_endpoint_id attaches a signature_preview for verifier probes."
   },
   {
     "resource": "sandbox",
@@ -1393,7 +1395,7 @@
     "response_schema": "AutoTopupConfigResponse",
     "idempotency_key": "supported",
     "trace_id_header": "none",
-    "notes": "Replaces the configuration. enabled: true turns auto top-up on, including a configuration a failed automatic top-up or full refund of a cash top-up turned off; enabled: false keeps it off even when a card is saved later. A full cash refund pause reads enabled: false and blocks new auto top-ups until these settings are saved again with enabled: true; later automatic activity or card changes do not acknowledge the refund. When it ends enabled and the balance is already at or below threshold_brl, the write starts one automatic top-up of amount_brl on the saved card immediately, unless one is pending, and last_triggered_at shows it; otherwise the next one starts when a usage debit, phone-management fee, phone-purchase reservation, payment fee, or rental-receivable settlement leaves the balance at or below threshold_brl, regardless of its prior balance, unless one is pending. Auto top-up never starts for a suspended organization. The watchdog also checks enabled, unpaused configurations with a wallet at or below the threshold and no pending automatic top-up, currently every 15 minutes. After a card re-arm the next such debit or watchdog run can start one. If credit from the top-up leaves the wallet at or below the threshold, the next such debit or watchdog run can start another of amount_brl; the charge is never resized to the shortfall. Honors Idempotency-Key; a duplicate sent while the first request is still in flight returns 409 idempotency_key_in_progress — retry after the original finishes."
+    "notes": "Replaces the configuration. enabled: true turns auto top-up on, including a configuration a failed automatic top-up or full refund of a cash top-up turned off; enabled: false keeps it off even when a card is saved later. A full cash refund pause reads enabled: false and blocks new auto top-ups until these settings are saved again with enabled: true; later automatic activity or card changes do not acknowledge the refund. When it ends enabled and the balance is already at or below threshold_brl, the write starts one automatic top-up of amount_brl on the saved card immediately, unless one is pending, and last_triggered_at shows it; otherwise the next one starts when a usage debit, phone-purchase reservation, or payment fee leaves the balance at or below threshold_brl, regardless of its prior balance, unless one is pending. Auto top-up never starts for a suspended organization. The watchdog also checks enabled, unpaused configurations with a wallet at or below the threshold and no pending automatic top-up, currently every 15 minutes. After a card re-arm the next such debit or watchdog run can start one. If credit from the top-up leaves the wallet at or below the threshold, the next such debit or watchdog run can start another of amount_brl; the charge is never resized to the shortfall. Honors Idempotency-Key; a duplicate sent while the first request is still in flight returns 409 idempotency_key_in_progress — retry after the original finishes."
   },
   {
     "resource": "billing",
@@ -1404,18 +1406,6 @@
     "request_schema": null,
     "query_schema": "ListLedgerEntriesQuery",
     "response_schema": "ListLedgerEntriesResponse",
-    "idempotency_key": "none",
-    "trace_id_header": "none"
-  },
-  {
-    "resource": "billing",
-    "operation": "list_phone_management",
-    "method": "GET",
-    "path": "/v1/billing/phone-management",
-    "scope": "billing:read",
-    "request_schema": null,
-    "query_schema": "ListPhoneManagementQuery",
-    "response_schema": "ListPhoneManagementResponse",
     "idempotency_key": "none",
     "trace_id_header": "none"
   },
@@ -1970,7 +1960,7 @@
     "response_schema": "PhoneNumberMutationResponse",
     "idempotency_key": "supported",
     "trace_id_header": "none",
-    "notes": "Sandbox requests provision a simulated number and return 202 with the requested phone; sandbox provisioning is KYC-free, capped by neither number limit, and does not reserve or debit balance. A production request rents nothing: it creates a rental order as POST /v1/phone-numbers/orders does and returns 409 conflict with stable code phone_number_rental_approval_required, whose error.details.order carries the order id, approval_url and expires_at, with the error.feedback pointer; an organization owner or admin approves or declines the order in the dashboard, no API key can approve it, and GET /v1/phone-numbers/orders/:order_id follows it. The 409 already created the order, so a client must not also create one with POST /v1/phone-numbers/orders. A replay of the same Idempotency-Key returns the same 409 for the same order; without a key each request creates a new order. Before the order is written, production requests require a verified business identity (KYC). When PHONE_PROVISIONING_REQUIRE_BILLING_WHATSAPP is enabled (default false), they also require a current verified owner/admin billing WhatsApp recipient with explicit transactional consent; startup rejects that enabled policy without valid paired AUTH_WA_SIGNUP proof settings. The recipient is an operational contact, never the legal KYC phone. Missing identity fails with 403 authorization_error and stable code kyc_required (no identity / rejected) or kyc_pending (submitted and awaiting approval, which can be manual review by a Tyxter operator); under the enabled policy, missing or stale recipient evidence fails with billing_whatsapp_required. Production requests then enforce two number limits in order — the subscription plan phone-number allowance, which counts numbers of both kinds (FREE 1 / STANDARD 3 / GROWTH no fixed limit), returning 402 payment_required with stable code plan_phone_limit_reached, and then a per-organization limit on concurrently held Tyxter-provisioned (Salvy) numbers (FREE 1 / STANDARD 3 / GROWTH 10 by default, raised per organization on request) returning 409 conflict with stable code phone_number_limit_reached — release a Tyxter-provisioned number to free its slot, or contact us to raise the limit. When the rental price or a charge date cannot be determined it fails with 503 phone_number_rental_preview_unavailable and creates nothing. Nothing is reserved before the approval. All provision requests share a per-organization rate limit with order creation (burst 5, sustained 10/hour) returning 429 rate_limited with Retry-After."
+    "notes": "Sandbox requests provision a simulated number and return 202 with the requested phone; sandbox provisioning is KYC-free, capped by neither number limit, and does not reserve or debit balance. A production request creates an order for a WhatsApp-only line rented from Tyxter as POST /v1/phone-numbers/orders does and returns 409 conflict with stable code phone_number_rental_approval_required, whose error.details.order carries the order id, approval_url and expires_at, with the error.feedback pointer. The line works only through Meta’s Cloud API. It supports no regular SMS, voice calls or mobile data, and cannot be used in the WhatsApp or WhatsApp Business phone app. The dashboard shows the only SMS it receives: the WhatsApp verification code. An organization owner or admin approves or declines the order in the dashboard. GET /v1/phone-numbers/orders/:order_id follows it, and API keys cannot approve it. The rental starts only after approval. The 409 already created the order, so a client must not also create one with POST /v1/phone-numbers/orders. A replay of the same Idempotency-Key returns the same 409 for the same order; without a key each request creates a new order. Before the order is written, production requests require a verified business identity (KYC). Missing identity fails with 403 authorization_error and stable code kyc_required (no identity / rejected) or kyc_pending (submitted and awaiting approval, which can be manual review by a Tyxter operator). Production requests then enforce two number limits in order — the subscription plan phone-number allowance, which counts numbers of both kinds (FREE 1 / STANDARD 3 / GROWTH no fixed limit), returning 402 payment_required with stable code plan_phone_limit_reached, and then a per-organization limit on concurrently held lines rented from Tyxter (FREE 1 / STANDARD 3 / GROWTH 10 by default, raised per organization on request) returning 409 conflict with stable code phone_number_limit_reached — cancel the line’s renewal if eligible and retry after its month-end release, or contact us to raise the limit. When the rental price or a charge date cannot be determined it fails with 503 phone_number_rental_preview_unavailable and creates nothing. Nothing is reserved before the approval. All provision requests share a per-organization rate limit with order creation (burst 5, sustained 10/hour) returning 429 rate_limited with Retry-After."
   },
   {
     "resource": "phone_numbers",
@@ -1983,7 +1973,7 @@
     "response_schema": "PhoneNumberOrderResponse",
     "idempotency_key": "supported",
     "trace_id_header": "none",
-    "notes": "Creates a rental order for one Tyxter-provisioned number and returns 201. A production order runs the provision checks in their order (verified business identity, the optional billing WhatsApp recipient, the plan phone-number allowance and the Tyxter-provisioned number limit) and reserves nothing: it returns status awaiting_approval with the priced preview, terms_version, expires_at (24 hours after the preview) and an approval_url to hand to an organization owner or admin, who approves or declines it in the dashboard. No API key can approve an order. When the rental price or a charge date cannot be determined it fails with 503 phone_number_rental_preview_unavailable and creates nothing. A sandbox order is approved on creation with a free preview and starts the simulated provisioning at once. Order creation shares the per-organization provision rate limit (burst 5, sustained 10/hour). A replay of the same Idempotency-Key returns the order as it was created; read GET /v1/phone-numbers/orders/:order_id for its current status."
+    "notes": "Creates a rental order and returns 201. In production, the order is for a WhatsApp-only line rented from Tyxter. The line works only through Meta’s Cloud API. It supports no regular SMS, voice calls or mobile data, and cannot be used in the WhatsApp or WhatsApp Business phone app. The dashboard shows the only SMS it receives: the WhatsApp verification code. A production order runs the provision checks in their order (verified business identity, the plan phone-number allowance and the limit on lines rented from Tyxter) and reserves nothing: it returns status awaiting_approval with the priced preview, terms_version, expires_at (24 hours after the preview) and an approval_url to hand to an organization owner or admin, who approves or declines it in the dashboard. No API key can approve an order. When the rental price or a charge date cannot be determined it fails with 503 phone_number_rental_preview_unavailable and creates nothing. A sandbox order is approved on creation with a free preview and starts the simulated provisioning at once. Order creation shares the per-organization provision rate limit (burst 5, sustained 10/hour). A replay of the same Idempotency-Key returns the order as it was created; read GET /v1/phone-numbers/orders/:order_id for its current status."
   },
   {
     "resource": "phone_numbers",
@@ -1996,7 +1986,7 @@
     "response_schema": "PhoneNumberOrderResponse",
     "idempotency_key": "none",
     "trace_id_header": "none",
-    "notes": "Returns the rental order in the API key project and environment with its current status: awaiting_approval, approved, declined, expired (failure carries phone_number_order_expired or phone_number_order_terms_changed; declined carries phone_number_order_declined), then provisioning, fulfilled or failed as the approved number progresses. An unknown or foreign order id returns 404 phone_number_order_not_found."
+    "notes": "Returns the order for a WhatsApp-only line rented from Tyxter or its sandbox simulation, scoped to the API key project and environment with its current status: awaiting_approval, approved, declined, expired (failure carries phone_number_order_expired or phone_number_order_terms_changed; declined carries phone_number_order_declined), then provisioning, fulfilled or failed as the approved number progresses. An unknown or foreign order id returns 404 phone_number_order_not_found."
   },
   {
     "resource": "phone_numbers",
@@ -2051,6 +2041,19 @@
   },
   {
     "resource": "phone_numbers",
+    "operation": "retrieve_rental_contract",
+    "method": "GET",
+    "path": "/v1/phone-numbers/:phone_number_id/rental-contract",
+    "scope": "phone_numbers:read",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "PhoneRentalContractResponse",
+    "idempotency_key": "none",
+    "trace_id_header": "none",
+    "notes": "Reads the approval record for a WhatsApp-only line rented from Tyxter through the phone’s current scope: recorded, unrecorded or not_applicable. The order preview is historical; current_terms points to today’s terms, not proof of accepted text. Available during credit exhaustion. Unknown and out-of-scope phones return identical 404 phone_number_not_found."
+  },
+  {
+    "resource": "phone_numbers",
     "operation": "request_meta_diagnostics",
     "method": "POST",
     "path": "/v1/phone-numbers/:phone_number_id/meta-diagnostics",
@@ -2086,7 +2089,7 @@
     "response_schema": "PhoneNumberResponse",
     "idempotency_key": "none",
     "trace_id_header": "none",
-    "notes": "Marks the number disconnected, emits phone_number.disconnected and is a no-op on terminal rows. It does not release the number: a production Tyxter-rented (Salvy) number keeps its monthly rental until it is released through POST /v1/phone-numbers/:phone_number_id/release; the release request (status release_requested) stops further monthly charges. An unknown or out-of-scope phone id returns 404 phone_number_not_found."
+    "notes": "Disconnect a number from Tyxter. For an eligible number, Tyxter marks its record disconnected and emits phone_number.disconnected. This action makes no Meta call, leaves the Meta registration in place, does not free the number for WhatsApp onboarding elsewhere, and does not end a rental. It is a no-op on eligible terminal rows. Held or unresolved production WhatsApp-only lines rented from Tyxter return 409 phone_number_rental_action_required before any change or terminal no-op. To cancel the line’s renewal while it is active or verifying, use POST /v1/phone-numbers/{phone_number_id}/cancel-renewal. For any other held or unresolved rental, including a disconnected or failed one, contact support through POST /v1/feedback with its phone number id. An unknown or out-of-scope phone id returns 404 phone_number_not_found."
   },
   {
     "resource": "phone_numbers",
@@ -2099,7 +2102,7 @@
     "response_schema": "PhoneNumberResponse",
     "idempotency_key": "required",
     "trace_id_header": "none",
-    "notes": "Ends optional customer-Salvy management while preserving the same BYON phone and Meta link."
+    "notes": "Ends the Salvy import link while preserving the same BYON phone and Meta link."
   },
   {
     "resource": "phone_numbers",
@@ -2112,7 +2115,20 @@
     "response_schema": "PhoneNumberResponse",
     "idempotency_key": "supported",
     "trace_id_header": "none",
-    "notes": "Returns 202. A Salvy number moves to release_requested and a worker cancels it at Salvy; the row becomes released, with phone_number.released, once Salvy accepts the cancellation or reports the line already gone, and other Salvy failures are retried while it stays release_requested. A BYON number moves directly to released. A replay on a terminal row returns it unchanged. An unknown or out-of-scope phone id returns 404 phone_number_not_found. A production Salvy number whose E.164 is connected through another production phone number of the organization returns 409 phone_number_in_use_elsewhere and nothing is cancelled; support moves the rental onto the connected phone number."
+    "notes": "Held or unresolved production WhatsApp-only lines rented from Tyxter return 409 phone_number_rental_action_required without changes. To cancel the line’s renewal while it is active or verifying, use POST /v1/phone-numbers/{phone_number_id}/cancel-renewal. For any other held or unresolved rental, including a disconnected or failed one, contact support through POST /v1/feedback with its phone number id. Eligible requests return 202. Eligible rented lines that still need release move to release_requested for worker processing. The worker marks the number released and emits phone_number.released once Tyxter’s carrier accepts the cancellation or reports the line already gone. Other carrier failures are retried while the number stays release_requested. A line you own moves directly to released in Tyxter. Releasing a line imported from your Salvy account ends its import link. In production, the line stays in your Salvy account. A replay on a terminal row returns it unchanged. An unknown or out-of-scope phone id returns 404 phone_number_not_found. A held production line rented from Tyxter whose number is connected through another production phone number in the organization also returns 409 phone_number_rental_action_required without changes. Contact support through POST /v1/feedback with the phone number id so support can move the rental onto the connected phone record."
+  },
+  {
+    "resource": "phone_numbers",
+    "operation": "cancel_renewal",
+    "method": "POST",
+    "path": "/v1/phone-numbers/:phone_number_id/cancel-renewal",
+    "scope": "phone_numbers:write",
+    "request_schema": null,
+    "query_schema": null,
+    "response_schema": "phoneNumberCancelRenewalResponseSchema",
+    "idempotency_key": "supported",
+    "trace_id_header": "none",
+    "notes": "Returns 200 { phone_number_id, release_date } for an active or verifying production WhatsApp-only line rented from Tyxter. Cancellation is irreversible. The line keeps serving until release on the last UTC day, 12:00–18:00 UTC. The current month remains charged. Charges stop for later months. Repeats return the same date. The last valid cancellation time is 11:59:59 UTC on the last day. From 12:00 UTC on the last day until 00:00 UTC on the 1st, new requests return 409 phone_number_renewal_cancel_window_closed with error.details.reopens_at. Cancellation on the 1st releases at that month’s end. Its 00:05 UTC charge still applies. Ineligible numbers return 409 phone_number_renewal_not_cancellable. Unknown or out-of-scope ids return 404 phone_number_not_found. Requires phone_numbers:write and remains available during credit exhaustion."
   },
   {
     "resource": "phone_numbers",
@@ -2210,7 +2226,7 @@
     "scope": "provider_connections:read",
     "request_schema": null,
     "query_schema": null,
-    "response_schema": "ProviderConnectionResponse",
+    "response_schema": "ProviderConnectionReadResponse",
     "idempotency_key": "none",
     "trace_id_header": "none"
   },
@@ -2276,7 +2292,7 @@
     "response_schema": "ProviderConnectionResponse",
     "idempotency_key": "required",
     "trace_id_header": "none",
-    "notes": "Queues candidate-key validation. The current stored Salvy credential is retained while the candidate is checked; the candidate is validated only after its connection reaches connected."
+    "notes": "Queues candidate-key validation and keeps the current key until promotion. The salvy.operation field shows the connection’s latest Salvy operation of any kind, with no operation ID or kind. Poll before any other Salvy operation starts. While the rotation result is still current, succeeded means Tyxter promoted the key and failed means Tyxter kept the previous key. Read salvy.operation.error_code for the reason. If another operation replaced the result, a change in salvy.credential_hint to the candidate’s expected hint confirms promotion if no other credential change intervened. The hint is the current key’s last four characters, or null for keys of four characters or fewer. Matching hints cannot confirm the outcome once the operation result has been replaced."
   },
   {
     "resource": "provider_connections",
@@ -2289,7 +2305,7 @@
     "response_schema": "ProviderConnectionResponse",
     "idempotency_key": "required",
     "trace_id_header": "none",
-    "notes": "Queues a refresh of the persisted Salvy inventory snapshot using the current stored credential on a connected connection. The API serves the existing snapshot until the worker completes."
+    "notes": "Queues a refresh using the connected Salvy credential. A new production refresh without coverage returns 403 salvy_byok_subscription_required and queues nothing. The list serves the account snapshot as soon as it is stored. WhatsApp code reads follow for live production imports whose matching listed line is active. Inactive or absent lines are skipped. An SMS read failure leaves the list available and the worker checks the remaining active lines before settling as failed. Loss of connection or attachment authority, or plan coverage, stops further reads and can fail the operation with salvy_connection_unavailable."
   },
   {
     "resource": "provider_connections",
@@ -2301,7 +2317,8 @@
     "query_schema": "CursorPaginationQuery",
     "response_schema": "ListSalvyNumbersResponse",
     "idempotency_key": "none",
-    "trace_id_header": "none"
+    "trace_id_header": "none",
+    "notes": "The top-level discovered_at is the time of the saved account-list read for this page, or null before a list is stored."
   },
   {
     "resource": "provider_connections",
@@ -2350,7 +2367,20 @@
     "response_schema": "MessageResponse",
     "idempotency_key": "supported",
     "trace_id_header": "supported",
-    "notes": "Sandbox keys only. Creates a deterministic inbound message for local webhook and flow testing."
+    "notes": "Sandbox keys only. Creates a deterministic inbound message for local webhook and flow testing. A 403 authorization_error can carry account_suspended for a suspended organization, insufficient_scope for a key without sandbox:write, or phone_service_suspended when the scoped receiving identity check prevents simulated media storage."
+  },
+  {
+    "resource": "sandbox",
+    "operation": "create_message_echo",
+    "method": "POST",
+    "path": "/v1/sandbox/message-echoes",
+    "scope": "sandbox:write",
+    "request_schema": "SandboxMessageEchoRequest",
+    "query_schema": null,
+    "response_schema": "SandboxMessageEchoResponse",
+    "idempotency_key": "supported",
+    "trace_id_header": "supported",
+    "notes": "Sandbox keys only. Records a simulated WhatsApp Business app text echo, edit, or revoke."
   },
   {
     "resource": "sandbox",
